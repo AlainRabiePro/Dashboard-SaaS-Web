@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -98,13 +99,16 @@ export function DashboardSidebar() {
                 {!collapsed && <span>Facturation</span>}
               </div>
             </Link>
-            <div className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer group",
+            <Link href="/settings">
+              <div className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer group",
+                pathname === "/settings" ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 collapsed && "justify-center px-0"
               )}>
                 <Settings className="h-4 w-4 shrink-0" />
                 {!collapsed && <span>Paramètres</span>}
-            </div>
+              </div>
+            </Link>
           </nav>
         </div>
       </div>

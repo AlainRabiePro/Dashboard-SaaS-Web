@@ -20,6 +20,8 @@ export interface UserProfile {
   email: string;
   plan: 'Starter' | 'Professional' | 'Enterprise';
   storageLimit: number;
+  language?: string;
+  timezone?: string;
 }
 
 export interface Site {
@@ -74,6 +76,18 @@ export function updateUserPlan(uid: string, plan: UserProfile['plan'], storageLi
   const userRef = doc(db, "users", uid);
   const data = { plan, storageLimit };
 
+  updateDoc(userRef, data).catch(async (err) => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: userRef.path,
+      operation: 'update',
+      requestResourceData: data
+    }));
+  });
+}
+
+export function updateUserProfile(uid: string, data: Partial<UserProfile>) {
+  const userRef = doc(db, "users", uid);
+  
   updateDoc(userRef, data).catch(async (err) => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: userRef.path,
