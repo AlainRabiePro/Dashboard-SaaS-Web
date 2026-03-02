@@ -7,6 +7,18 @@ import { Check } from 'lucide-react';
 
 const PLANS = [
   {
+    name: 'Free',
+    price: 0,
+    storage: 5,
+    features: [
+      '5 GB SSD Storage',
+      'Deploy up to 1 project',
+      'Basic Analytics',
+      'Community Support',
+    ],
+    hasToolAccess: false,
+  },
+  {
     name: 'Starter',
     price: 8.99,
     storage: 10,
@@ -31,18 +43,6 @@ const PLANS = [
     ],
     hasToolAccess: true,
   },
-  {
-    name: 'Business',
-    price: 'Custom',
-    features: [
-        'Everything in Pro, plus:',
-        'Dedicated Infrastructure',
-        'Enterprise-grade Security',
-        '24/7/365 Premium Support',
-        'Custom Integrations'
-    ],
-    hasToolAccess: true,
-  },
 ];
 
 export default function BillingPage() {
@@ -60,8 +60,8 @@ export default function BillingPage() {
             <CardHeader>
               <CardTitle>{plan.name}</CardTitle>
               <div className="flex items-baseline gap-2">
-                {plan.price === 'Custom' ? (
-                    <span className="text-4xl font-bold">Custom</span>
+                {plan.price === 0 ? (
+                    <span className="text-4xl font-bold">Free</span>
                 ) : (
                     <>
                         <span className="text-4xl font-bold">€{plan.price}</span>
@@ -71,7 +71,6 @@ export default function BillingPage() {
               </div>
             </CardHeader>
             <CardContent className="grid gap-6">
-               {plan.price === 'Custom' && <CardDescription>Contact us for a quote.</CardDescription>}
               <ul className="space-y-3">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-center gap-3">
@@ -82,13 +81,9 @@ export default function BillingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-                 {plan.price === 'Custom' ? (
-                    <Button className="w-full">Contact Us</Button>
-                 ) : (
-                    <Button className="w-full" disabled={plan.name === currentPlanName}>
-                        {plan.name === currentPlanName ? 'Current Plan' : 'Select Plan'}
-                    </Button>
-                 )}
+                <Button className="w-full" disabled={plan.name === currentPlanName}>
+                    {plan.name === currentPlanName ? 'Current Plan' : 'Select Plan'}
+                </Button>
             </CardFooter>
           </Card>
         ))}

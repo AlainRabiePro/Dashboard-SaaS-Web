@@ -15,6 +15,16 @@ import { MOCK_SUBSCRIPTION } from '@/lib/data';
 
 const DIALOG_PLANS = [
   {
+    name: 'Free',
+    price: 0,
+    features: [
+      '5 GB SSD Storage',
+      'Deploy up to 1 project',
+      'Basic Analytics',
+      'Community Support',
+    ],
+  },
+  {
     name: 'Starter',
     price: 8.99,
     features: [
@@ -33,17 +43,6 @@ const DIALOG_PLANS = [
       'Advanced Analytics',
       'Priority Support',
       'Access to "Deplora" and other tools',
-    ],
-  },
-  {
-    name: 'Business',
-    price: 'Custom',
-    features: [
-        'Everything in Pro, plus:',
-        'Dedicated Infrastructure',
-        'Enterprise-grade Security',
-        '24/7/365 Premium Support',
-        'Custom Integrations'
     ],
   },
 ];
@@ -68,8 +67,8 @@ export function UpgradePlanDialog({ isOpen, setIsOpen }: UpgradePlanDialogProps)
                 <CardHeader className="text-center">
                   <CardDescription className="text-sm font-semibold tracking-wider uppercase text-primary">{plan.name}</CardDescription>
                   <div className="flex items-baseline justify-center gap-1">
-                    {plan.price === 'Custom' ? (
-                        <span className="text-4xl font-bold">Custom</span>
+                    {plan.price === 0 ? (
+                        <span className="text-4xl font-bold">Free</span>
                     ) : (
                         <>
                             <span className="text-4xl font-bold">€{plan.price}</span>
@@ -79,9 +78,7 @@ export function UpgradePlanDialog({ isOpen, setIsOpen }: UpgradePlanDialogProps)
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 grid gap-6">
-                  {plan.name === 'Business' ? (
-                    <p className="text-center text-muted-foreground text-sm">Please contact us for more information</p>
-                  ) : <div className="h-9"></div>}
+                  <div className="h-9"></div>
                   <ul className="space-y-3">
                     {plan.features.map((feature, i) => (
                       <li key={i} className="flex items-start gap-3">
@@ -92,13 +89,9 @@ export function UpgradePlanDialog({ isOpen, setIsOpen }: UpgradePlanDialogProps)
                   </ul>
                 </CardContent>
                 <CardFooter>
-                    {plan.name === 'Business' ? (
-                        <Button className="w-full">Contact Us</Button>
-                    ) : (
-                        <Button className="w-full" disabled={plan.name === currentPlanName}>
-                            {plan.name === currentPlanName ? 'Current Plan' : 'Upgrade'}
-                        </Button>
-                    )}
+                    <Button className="w-full" disabled={plan.name === currentPlanName}>
+                        {plan.name === currentPlanName ? 'Current Plan' : 'Upgrade'}
+                    </Button>
                 </CardFooter>
               </Card>
             ))}

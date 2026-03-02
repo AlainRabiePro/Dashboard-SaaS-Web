@@ -4,13 +4,13 @@ export type Project = {
     domain: string;
     storageUsed: number; // in GB
     status: 'Running' | 'Stopped';
-    plan: 'Starter' | 'Pro' | 'Business';
+    plan: 'Free' | 'Starter' | 'Pro';
     userId: string;
     createdAt: Date;
 };
   
 export type Subscription = {
-    plan: 'Starter' | 'Pro' | 'Business';
+    plan: 'Free' | 'Starter' | 'Pro';
     monthlyCost: number;
     storageLimit: number; // in GB
     cpuCores: number; 

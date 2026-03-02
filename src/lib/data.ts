@@ -53,7 +53,7 @@ export const MOCK_PROJECTS: Project[] = [
     domain: 'zenith-store.com',
     storageUsed: 10.0,
     status: 'Running',
-    plan: 'Business',
+    plan: 'Pro',
     userId: MOCK_USER_ID,
     createdAt: new Date('2024-01-20'),
   },

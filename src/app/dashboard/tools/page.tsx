@@ -37,7 +37,7 @@ const tools = [
 ];
 
 export default function ToolsPage() {
-  const hasAccess = MOCK_SUBSCRIPTION.plan !== 'Starter';
+  const hasAccess = MOCK_SUBSCRIPTION.plan === 'Pro';
 
   if (!hasAccess) {
     return (

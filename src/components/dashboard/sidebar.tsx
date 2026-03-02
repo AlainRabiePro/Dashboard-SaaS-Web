@@ -64,7 +64,7 @@ const NavLink = ({ href, icon: Icon, label }: typeof navItems[0]) => {
 };
 
 const NavContent = () => {
-    const hasToolAccess = MOCK_SUBSCRIPTION.plan !== 'Starter';
+    const hasToolAccess = MOCK_SUBSCRIPTION.plan === 'Pro';
 
     return (
         <>
