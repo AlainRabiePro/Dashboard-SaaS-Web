@@ -1,8 +1,13 @@
 'use client';
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 
 interface UsageChartsProps {
   cpuUsage: number;
@@ -26,7 +31,7 @@ const chartConfig = {
     label: 'RAM',
     color: 'hsl(var(--chart-2))',
   },
-} 
+} satisfies ChartConfig;
 
 export function UsageCharts({ cpuUsage, ramUsage }: UsageChartsProps) {
   const data = chartData(cpuUsage, ramUsage);
@@ -37,8 +42,13 @@ export function UsageCharts({ cpuUsage, ramUsage }: UsageChartsProps) {
         <CardTitle>Resource Usage Overview</CardTitle>
       </CardHeader>
       <CardContent className="pl-2">
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data} layout="vertical" margin={{ left: 10 }}>
+        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+          <BarChart
+            accessibilityLayer
+            data={data}
+            layout="vertical"
+            margin={{ left: 10 }}
+          >
             <XAxis type="number" hide />
             <YAxis
               dataKey="name"
@@ -54,7 +64,7 @@ export function UsageCharts({ cpuUsage, ramUsage }: UsageChartsProps) {
             />
             <Bar dataKey="usage" radius={[4, 4, 4, 4]} />
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   );
