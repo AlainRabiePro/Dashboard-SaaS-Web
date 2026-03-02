@@ -125,7 +125,7 @@ export function ProjectList({ projects, loading }: ProjectListProps) {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{project.storageUsed.toFixed(1)} GB</TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {project.createdAt && format(project.createdAt.toDate(), 'MMM d, yyyy')}
+                        {project.createdAt?.toDate && format(project.createdAt.toDate(), 'MMM d, yyyy')}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
