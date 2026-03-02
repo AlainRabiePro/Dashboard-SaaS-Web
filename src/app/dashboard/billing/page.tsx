@@ -1,98 +1,119 @@
 'use client';
 
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Download } from 'lucide-react';
 import { useData } from '@/components/data-provider';
 import { PLANS } from '@/lib/plans';
-import { useAuth } from '@/components/auth/auth-provider';
-import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import React from 'react';
+import { UpgradePlanDialog } from '@/components/dashboard/upgrade-plan-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const MOCK_INVOICES = [
+    { id: 'INV-003', date: new Date('2024-05-01'), amount: 13.99, status: 'Paid' },
+    { id: 'INV-002', date: new Date('2024-04-01'), amount: 13.99, status: 'Paid' },
+    { id: 'INV-001', date: new Date('2024-03-01'), amount: 8.99, status: 'Paid' },
+];
 
 export default function BillingPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
   const { subscription } = useData();
-  const [isLoading, setIsLoading] = React.useState<string | null>(null);
-  const currentPlanName = subscription?.plan;
+  const [isUpgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
-  const handlePlanChange = (plan: typeof PLANS[0]) => {
-    if (!user || !subscription || plan.name === currentPlanName) return;
-
-    setIsLoading(plan.name);
-    
-    const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
-    updateDoc(subscriptionRef, {
-      plan: plan.name,
-      monthlyCost: plan.price,
-      storageLimit: plan.storageLimit,
-      cpuCores: plan.cpuCores,
-      ram: plan.ram,
-    }).catch((error) => {
-      console.error('Error updating plan:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Update Failed',
-        description: 'Could not update your plan. Please try again.',
-      });
-    });
-
-    toast({
-      title: 'Plan Updated!',
-      description: `You are now on the ${plan.name} plan.`,
-    });
-    setIsLoading(null);
-  };
+  const currentPlanDetails = subscription ? PLANS.find(p => p.name === subscription.plan) : null;
 
   return (
-    <div className="grid gap-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Billing & Plans</h1>
-        <p className="text-muted-foreground">Manage your subscription and choose the best plan for your needs.</p>
-      </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {PLANS.map((plan) => (
-          <Card key={plan.name} className={plan.name === currentPlanName ? 'border-primary ring-2 ring-primary' : ''}>
-            <CardHeader>
-              <CardTitle>{plan.name}</CardTitle>
-              <div className="flex items-baseline gap-2">
-                {plan.price === 0 ? (
-                    <span className="text-4xl font-bold">Free</span>
+    <>
+      <div className="grid gap-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
+          <p className="text-muted-foreground">Manage your subscription and view your payment history.</p>
+        </div>
+        <div className="grid gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoice History</CardTitle>
+                <CardDescription>Your past monthly invoices.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead><span className="sr-only">Download</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {MOCK_INVOICES.map(invoice => (
+                        <TableRow key={invoice.id}>
+                            <TableCell className="font-medium">{invoice.id}</TableCell>
+                            <TableCell>{format(invoice.date, 'MMM d, yyyy')}</TableCell>
+                            <TableCell>€{invoice.amount.toFixed(2)}</TableCell>
+                            <TableCell>
+                                <Badge variant={invoice.status === 'Paid' ? 'default' : 'secondary'} className={invoice.status === 'Paid' ? 'bg-green-600/20 text-green-400 border-green-600/30' : ''}>
+                                    {invoice.status}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Button variant="outline" size="icon">
+                                    <Download className="h-4 w-4" />
+                                    <span className="sr-only">Download invoice</span>
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader>
+                <CardTitle>Current Plan</CardTitle>
+                {subscription ? (
+                    <CardDescription>You are on the <span className="font-bold text-primary">{subscription.plan}</span> plan.</CardDescription>
                 ) : (
-                    <>
-                        <span className="text-4xl font-bold">€{plan.price}</span>
-                        <span className="text-muted-foreground">/month</span>
-                    </>
+                    <Skeleton className="h-4 w-3/4 mt-1" />
                 )}
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-              <ul className="space-y-3">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                    <span className="text-sm text-muted-foreground">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-                <Button
-                    className="w-full"
-                    disabled={plan.name === currentPlanName || !!isLoading}
-                    onClick={() => handlePlanChange(plan)}
-                >
-                    {isLoading === plan.name ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    {plan.name === currentPlanName ? 'Current Plan' : 'Select Plan'}
-                </Button>
-            </CardFooter>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent className="grid gap-6">
+                {currentPlanDetails ? (
+                    <ul className="space-y-3">
+                        {currentPlanDetails.features.map((feature, i) => (
+                        <li key={i} className="flex items-center gap-3">
+                            <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                            <span className="text-sm text-muted-foreground">{feature}</span>
+                        </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="space-y-3">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="flex items-start gap-3">
+                                <Skeleton className="h-5 w-5 rounded-full" />
+                                <Skeleton className="h-4 flex-1" />
+                            </div>
+                        ))}
+                    </div>
+                )}
+              </CardContent>
+              <CardFooter>
+                  <Button className="w-full" onClick={() => setUpgradeDialogOpen(true)} disabled={!subscription}>
+                    Change Plan
+                  </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
       </div>
-    </div>
+      <UpgradePlanDialog isOpen={isUpgradeDialogOpen} setIsOpen={setUpgradeDialogOpen} />
+    </>
   );
 }

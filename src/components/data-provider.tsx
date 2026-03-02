@@ -7,31 +7,16 @@ import { useDocumentData } from 'react-firebase-hooks/firestore';
 import { collection, doc, orderBy, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Project, Subscription, UsageStats } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
 
 interface DataContextType {
-  projects: Project[];
-  subscription: Subscription | null;
-  usage: UsageStats | null;
+  projects: Project[] | undefined;
+  subscription: Subscription | undefined;
+  usage: UsageStats | undefined;
   loading: boolean;
   error?: any;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
-
-const DEFAULT_SUBSCRIPTION: Subscription = {
-  plan: 'Free',
-  monthlyCost: 0,
-  storageLimit: 5,
-  cpuCores: 1,
-  ram: 1,
-};
-
-const DEFAULT_USAGE: UsageStats = {
-  cpu: 0,
-  ram: 0,
-  storage: 0,
-};
 
 export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
@@ -48,21 +33,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const error = projectsError || subscriptionError || usageError;
 
   const value = useMemo(() => ({
-    projects: (projects as Project[]) || [],
-    subscription: (subscription as Subscription) || DEFAULT_SUBSCRIPTION,
-    usage: (usage as UsageStats) || DEFAULT_USAGE,
+    projects: projects as Project[] | undefined,
+    subscription: subscription as Subscription | undefined,
+    usage: usage as UsageStats | undefined,
     loading,
     error,
   }), [projects, subscription, usage, loading, error]);
-
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-4">Loading your data...</p>
-      </div>
-    );
-  }
 
   return (
     <DataContext.Provider value={value}>
