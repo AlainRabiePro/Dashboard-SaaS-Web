@@ -33,7 +33,7 @@ const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/projects', icon: HardDrive, label: 'Projects' },
   { href: '/dashboard/billing', icon: CreditCard, label: 'Billing' },
-  { href: '/dashboard/tools', icon: Wrench, label: 'Tools' },
+  { href: '/dashboard/tools', icon: Wrench, label: 'Outils' },
 ];
 
 const NavLink = ({ href, icon: Icon, label }: typeof navItems[0]) => {

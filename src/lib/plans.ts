@@ -38,7 +38,7 @@ export const PLANS = [
       'Deploy unlimited projects',
       'Advanced Analytics',
       'Priority Support',
-      'Access to "Deplora" and other tools',
+      'Accès à "Deplora" et à d\'autres outils',
     ],
     hasToolAccess: true,
   },
