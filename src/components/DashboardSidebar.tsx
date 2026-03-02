@@ -14,7 +14,7 @@ import {
   ChevronRight,
   Zap,
   Settings,
-  HelpCircle
+  Wrench
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projets", href: "/sites", icon: Globe },
   { name: "Domaines", href: "/domains", icon: LinkIcon },
+  { name: "Outils", href: "/tools", icon: Wrench },
   { name: "Infrastructure", href: "/storage", icon: HardDrive },
 ];
 
