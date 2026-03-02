@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
@@ -23,19 +22,20 @@ export default function DashboardLayout({
   if (loading || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Activity className="h-8 w-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground dark">
       <DashboardSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="container max-w-7xl mx-auto p-4 md:p-8">
+      <main className="flex-1 overflow-auto dashboard-grid-bg">
+        <div className="max-w-[1200px] mx-auto px-4 py-8 md:px-8">
           {children}
         </div>
       </main>
     </div>
   );
 }
+import { Activity } from "lucide-react";

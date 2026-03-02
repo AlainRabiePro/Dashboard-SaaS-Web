@@ -12,19 +12,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
-  Cpu
+  Settings,
+  HelpCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
+import { Separator } from "./ui/separator";
 
 const navItems = [
-  { name: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Projets", href: "/sites", icon: Globe },
   { name: "Domaines", href: "/domains", icon: LinkIcon },
   { name: "Infrastructure", href: "/storage", icon: HardDrive },
-  { name: "Facturation", href: "/billing", icon: CreditCard },
 ];
 
 export function DashboardSidebar() {
@@ -34,88 +35,115 @@ export function DashboardSidebar() {
 
   return (
     <div className={cn(
-      "relative flex flex-col h-screen bg-card border-r border-white/5 transition-all duration-500 ease-in-out z-40 shadow-2xl shadow-black",
-      collapsed ? "w-20" : "w-72"
+      "relative flex flex-col h-screen bg-background border-r border-border transition-all duration-300 ease-in-out z-40",
+      collapsed ? "w-[60px]" : "w-64"
     )}>
       {/* Brand Section */}
-      <div className="p-8 flex items-center justify-between">
+      <div className="h-16 flex items-center px-4">
         {!collapsed && (
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-primary to-accent p-2 rounded-xl shadow-lg shadow-primary/20">
-              <Zap className="h-6 w-6 text-white" />
+          <div className="flex items-center gap-2">
+            <div className="bg-primary p-1.5 rounded text-primary-foreground">
+              <Zap className="h-5 w-5 fill-current" />
             </div>
-            <span className="text-2xl font-black text-white tracking-tighter italic">Saas<span className="text-primary">Flow</span></span>
+            <span className="text-lg font-bold tracking-tight">SaasFlow</span>
           </div>
         )}
         {collapsed && (
-           <div className="bg-gradient-to-tr from-primary to-accent p-2 rounded-xl mx-auto">
-            <Zap className="h-6 w-6 text-white" />
+           <div className="bg-primary p-1.5 rounded text-primary-foreground mx-auto">
+            <Zap className="h-4 w-4 fill-current" />
           </div>
         )}
       </div>
 
+      <Separator className="bg-border/50" />
+
       {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-2 mt-8">
-        {!collapsed && <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] px-4 mb-4 opacity-50">Menu Principal</p>}
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link key={item.name} href={item.href}>
+      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+        <div>
+          {!collapsed && <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Principal</p>}
+          <nav className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link key={item.name} href={item.href}>
+                  <div className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer group",
+                    isActive 
+                      ? "bg-secondary text-foreground" 
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    collapsed && "justify-center px-0"
+                  )}>
+                    <item.icon className={cn(
+                      "h-4 w-4 shrink-0 transition-colors",
+                      isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    {!collapsed && <span>{item.name}</span>}
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div>
+          {!collapsed && <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Gestion</p>}
+          <nav className="space-y-1">
+            <Link href="/billing">
               <div className={cn(
-                "group flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-300 relative",
-                isActive 
-                  ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                  : "text-muted-foreground hover:bg-white/5 hover:text-white",
-                collapsed && "justify-center"
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer group",
+                pathname === "/billing" ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                collapsed && "justify-center px-0"
               )}>
-                <item.icon className={cn(
-                  "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
-                  isActive ? "text-white" : "text-muted-foreground group-hover:text-primary"
-                )} />
-                {!collapsed && <span>{item.name}</span>}
-                {isActive && !collapsed && (
-                  <div className="absolute right-4 h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                )}
+                <CreditCard className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>Facturation</span>}
               </div>
             </Link>
-          );
-        })}
-      </nav>
+            <div className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer group",
+                collapsed && "justify-center px-0"
+              )}>
+                <Settings className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>Paramètres</span>}
+            </div>
+          </nav>
+        </div>
+      </div>
 
       {/* User & Footer */}
-      <div className="p-6 border-t border-white/5 bg-black/20 space-y-6">
+      <div className="p-3 border-t border-border">
         {!collapsed && (
-          <div className="flex items-center gap-4 px-2 py-3 bg-white/5 rounded-2xl border border-white/5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center text-white font-black text-lg border border-white/20">
+          <div className="flex items-center gap-3 px-2 py-2 mb-2 rounded-md bg-muted/50 border border-border/40">
+            <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-bold text-xs shrink-0">
               {user?.displayName?.charAt(0) || user?.email?.charAt(0)}
             </div>
-            <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-bold text-white truncate">{user?.displayName || "Admin User"}</span>
-              <span className="text-[10px] text-muted-foreground font-medium truncate opacity-60 uppercase tracking-wider">{user?.email}</span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-foreground truncate">{user?.displayName || "Admin User"}</span>
+              <span className="text-[10px] text-muted-foreground truncate">{user?.email}</span>
             </div>
           </div>
         )}
         <Button 
           variant="ghost" 
+          size="sm"
           className={cn(
-            "w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl h-12 transition-all group", 
+            "w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 transition-colors", 
             collapsed && "justify-center px-0"
           )}
           onClick={signOut}
         >
-          <LogOut className="h-5 w-5 shrink-0 group-hover:-translate-x-1 transition-transform" />
-          {!collapsed && <span className="ml-3 font-bold">Déconnexion</span>}
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="ml-2">Déconnexion</span>}
         </Button>
       </div>
 
       {/* Toggle Button */}
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
-        className="absolute -right-3 top-24 h-7 w-7 rounded-full bg-card border-white/10 text-white hover:bg-primary transition-colors hidden md:flex shadow-xl"
+        className="absolute -right-3 top-20 h-6 w-6 rounded-full border border-border bg-background text-foreground hover:bg-muted transition-colors hidden md:flex shadow-sm"
         onClick={() => setCollapsed(!collapsed)}
       >
-        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
       </Button>
     </div>
   );
