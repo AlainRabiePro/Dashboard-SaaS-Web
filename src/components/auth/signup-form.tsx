@@ -53,11 +53,11 @@ export function SignupForm() {
 
       // Create user document in Firestore
       const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, {
+      setDoc(userDocRef, {
         uid: user.uid,
         email: user.email,
         displayName: user.email?.split('@')[0] || 'New User',
-      });
+      }).catch(e => console.error("Error creating user doc:", e));
 
       const starterPlan = PLANS.find(p => p.name === 'Starter');
       if (!starterPlan) {
@@ -66,25 +66,25 @@ export function SignupForm() {
 
       // Create default subscription
       const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
-      await setDoc(subscriptionRef, {
+      setDoc(subscriptionRef, {
         plan: starterPlan.name,
         monthlyCost: starterPlan.price,
         storageLimit: starterPlan.storageLimit,
         cpuCores: starterPlan.cpuCores,
         ram: starterPlan.ram,
-      });
+      }).catch(e => console.error("Error creating subscription:", e));
 
       // Create default usage stats
       const usageRef = doc(db, 'users', user.uid, 'usage', 'current');
-      await setDoc(usageRef, {
+      setDoc(usageRef, {
         cpu: 15,
         ram: 25,
         storage: 1.2,
-      });
+      }).catch(e => console.error("Error creating usage stats:", e));
       
       // Create a sample project
       const projectsColRef = collection(db, 'users', user.uid, 'projects');
-      await addDoc(projectsColRef, {
+      addDoc(projectsColRef, {
         name: 'My First Project',
         domain: 'example.com',
         storageUsed: 1.2,
@@ -92,7 +92,7 @@ export function SignupForm() {
         plan: 'Starter',
         userId: user.uid,
         createdAt: serverTimestamp(),
-      });
+      }).catch(e => console.error("Error creating sample project:", e));
 
       toast({
         title: 'Success',

@@ -17,17 +17,26 @@ export default function ProjectsPage() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = React.useState(false);
 
-  const handleProjectCreated = async (newProjectData: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => {
+  const handleProjectCreated = (newProjectData: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => {
     if (!user) return;
     const projectsColRef = collection(db, 'users', user.uid, 'projects');
-    await addDoc(projectsColRef, {
+    
+    addDoc(projectsColRef, {
         ...newProjectData,
         plan: subscription?.plan || 'Starter',
         status: 'Running',
         storageUsed: 0,
         userId: user.uid,
         createdAt: serverTimestamp(),
+    }).catch(error => {
+        console.error("Error creating project: ", error);
+        toast({
+            variant: 'destructive',
+            title: 'Creation Failed',
+            description: 'Could not create your project. Please try again.',
+        });
     });
+
     toast({
       title: 'Project Created',
       description: `Your new project "${newProjectData.name}" has been created.`,

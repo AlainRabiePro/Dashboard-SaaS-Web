@@ -28,7 +28,7 @@ import { Loader2 } from 'lucide-react';
 interface CreateProjectDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => Promise<void>;
+  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => void;
 }
 
 const formSchema = z.object({
@@ -50,10 +50,10 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
     },
   });
 
-  const onSubmit = async (values: FormData) => {
+  const onSubmit = (values: FormData) => {
     setIsSubmitting(true);
     try {
-      await onProjectCreated(values);
+      onProjectCreated(values);
       form.reset();
       setIsOpen(false);
     } catch (error) {

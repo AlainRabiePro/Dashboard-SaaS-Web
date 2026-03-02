@@ -36,18 +36,36 @@ export function ProjectList({ projects, loading }: ProjectListProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const handleStatusToggle = async (projectId: string, currentStatus: 'Running' | 'Stopped') => {
+  const handleStatusToggle = (projectId: string, currentStatus: 'Running' | 'Stopped') => {
     if (!user) return;
     const projectRef = doc(db, 'users', user.uid, 'projects', projectId);
-    await updateDoc(projectRef, {
+    
+    updateDoc(projectRef, {
       status: currentStatus === 'Running' ? 'Stopped' : 'Running'
+    }).catch((error) => {
+        console.error('Error updating project status:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Update Failed',
+            description: 'Could not update the project status.',
+        });
     });
+
     toast({ title: `Project ${currentStatus === 'Running' ? 'stopped' : 'started'}.`})
   };
 
-  const handleDelete = async (projectId: string) => {
+  const handleDelete = (projectId: string) => {
     if (!user) return;
-    await deleteDoc(doc(db, 'users', user.uid, 'projects', projectId));
+
+    deleteDoc(doc(db, 'users', user.uid, 'projects', projectId)).catch((error) => {
+        console.error('Error deleting project:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Delete Failed',
+            description: 'Could not delete the project.',
+        });
+    });
+
     toast({ variant: 'destructive', title: 'Project deleted.'})
   };
 
@@ -120,7 +138,7 @@ export function ProjectList({ projects, loading }: ProjectListProps) {
                   </TableRow>
                 ))
               ) : (
-                  <TableRow>
+                  <TableRow key="no-projects">
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                           No projects found. Click "New Project" to get started.
                       </TableCell>
