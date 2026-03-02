@@ -23,7 +23,7 @@ const AiProjectConfiguratorOutputSchema = z.object({
   suggestedCpuCores: z.number().describe('Suggested number of CPU cores (e.g., 1, 2, 4, 8).'),
   suggestedStorageGb: z.number().describe('Suggested storage in GB (e.g., 50, 100, 200, 500).'),
   suggestedHostingPlan:
-    z.enum(['Starter', 'Pro']).describe('Suggested hosting plan based on the project description.'),
+    z.enum(['Personal', 'Starter', 'Pro']).describe('Suggested hosting plan based on the project description.'),
   recommendationReasoning: z
     .string()
     .describe('A brief explanation for the suggested configuration.'),
@@ -44,6 +44,7 @@ const projectConfiguratorPrompt = ai.definePrompt({
 Your task is to analyze a user's project description and recommend optimal server resource configurations (RAM, CPU, storage) and a suitable hosting plan.
 
 Consider the following hosting plans and their general characteristics:
+- Personal: Best for very small projects, prototypes, or hobby sites with minimal traffic.
 - Starter: Suitable for small personal websites, blogs, or development environments. Limited resources.
 - Pro: Ideal for medium-sized applications, e-commerce sites, or projects with moderate traffic. Balanced resources.
 
@@ -51,7 +52,7 @@ Based on the provided project description, suggest:
 1.  Optimal RAM in GB (e.g., 2, 4, 8, 16)
 2.  Optimal CPU cores (e.g., 2, 4, 8)
 3.  Optimal storage in GB (e.g., 10, 50)
-4.  The most suitable hosting plan from 'Starter', or 'Pro'.
+4.  The most suitable hosting plan from 'Personal', 'Starter', or 'Pro'.
 5.  A brief explanation for your recommendation.
 
 Project Description: {{{projectDescription}}}`,

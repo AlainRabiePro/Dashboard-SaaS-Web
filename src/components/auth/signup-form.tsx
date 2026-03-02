@@ -59,19 +59,19 @@ export function SignupForm() {
         displayName: user.email?.split('@')[0] || 'New User',
       });
 
-      const starterPlan = PLANS.find(p => p.name === 'Starter');
-      if (!starterPlan) {
-        throw new Error('Starter plan definition not found.');
+      const personalPlan = PLANS.find(p => p.name === 'Personal');
+      if (!personalPlan) {
+        throw new Error('Personal plan definition not found.');
       }
 
       // Create default subscription
       const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
       await setDoc(subscriptionRef, {
-        plan: starterPlan.name,
-        monthlyCost: starterPlan.price,
-        storageLimit: starterPlan.storageLimit,
-        cpuCores: starterPlan.cpuCores,
-        ram: starterPlan.ram,
+        plan: personalPlan.name,
+        monthlyCost: personalPlan.price,
+        storageLimit: personalPlan.storageLimit,
+        cpuCores: personalPlan.cpuCores,
+        ram: personalPlan.ram,
       });
 
       // Create default usage stats
@@ -89,7 +89,7 @@ export function SignupForm() {
         domain: 'example.com',
         storageUsed: 1.2,
         status: 'Running',
-        plan: 'Starter',
+        plan: 'Personal',
         userId: user.uid,
         createdAt: serverTimestamp(),
       });
