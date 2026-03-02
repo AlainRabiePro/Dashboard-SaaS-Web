@@ -31,6 +31,18 @@ const PLANS = [
     ],
     hasToolAccess: true,
   },
+  {
+    name: 'Business',
+    price: 'Custom',
+    features: [
+        'Everything in Pro, plus:',
+        'Dedicated Infrastructure',
+        'Enterprise-grade Security',
+        '24/7/365 Premium Support',
+        'Custom Integrations'
+    ],
+    hasToolAccess: true,
+  },
 ];
 
 export default function BillingPage() {
@@ -42,17 +54,24 @@ export default function BillingPage() {
         <h1 className="text-3xl font-bold tracking-tight">Billing & Plans</h1>
         <p className="text-muted-foreground">Manage your subscription and choose the best plan for your needs.</p>
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {PLANS.map((plan) => (
           <Card key={plan.name} className={plan.name === currentPlanName ? 'border-primary ring-2 ring-primary' : ''}>
             <CardHeader>
               <CardTitle>{plan.name}</CardTitle>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold">€{plan.price}</span>
-                <span className="text-muted-foreground">/month</span>
+                {plan.price === 'Custom' ? (
+                    <span className="text-4xl font-bold">Custom</span>
+                ) : (
+                    <>
+                        <span className="text-4xl font-bold">€{plan.price}</span>
+                        <span className="text-muted-foreground">/month</span>
+                    </>
+                )}
               </div>
             </CardHeader>
             <CardContent className="grid gap-6">
+               {plan.price === 'Custom' && <CardDescription>Contact us for a quote.</CardDescription>}
               <ul className="space-y-3">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-center gap-3">
@@ -63,9 +82,13 @@ export default function BillingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" disabled={plan.name === currentPlanName}>
-                {plan.name === currentPlanName ? 'Current Plan' : 'Select Plan'}
-              </Button>
+                 {plan.price === 'Custom' ? (
+                    <Button className="w-full">Contact Us</Button>
+                 ) : (
+                    <Button className="w-full" disabled={plan.name === currentPlanName}>
+                        {plan.name === currentPlanName ? 'Current Plan' : 'Select Plan'}
+                    </Button>
+                 )}
             </CardFooter>
           </Card>
         ))}
