@@ -79,6 +79,21 @@ export async function getSites(uid: string): Promise<Site[]> {
   }
 }
 
+export async function getDomains(uid: string): Promise<Domain[]> {
+  const domainsRef = collection(db, "users", uid, "domains");
+  const q = query(domainsRef);
+  try {
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Domain));
+  } catch (err) {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: domainsRef.path,
+      operation: 'list'
+    }));
+    return [];
+  }
+}
+
 export async function getInvoices(uid: string): Promise<Invoice[]> {
   const invoicesRef = collection(db, "users", uid, "invoices");
   const q = query(invoicesRef, orderBy("date", "desc"));
@@ -120,7 +135,6 @@ export async function seedMockData(uid: string, email: string, name: string) {
   try {
     profileSnap = await getDoc(userRef);
   } catch (e) {
-    // Already handled in the call or via listener
     return;
   }
 
