@@ -1,0 +1,74 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User account information and plan details.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "plan": { "type": "string", "enum": ["Free Plan", "Pro Plan", "Enterprise"] },
+        "storageLimit": { "type": "number", "description": "Storage limit in GB" }
+      },
+      "required": ["name", "email", "plan", "storageLimit"]
+    },
+    "Site": {
+      "title": "Site",
+      "description": "A deployed application site.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "url", "status", "createdAt"]
+    },
+    "Domain": {
+      "title": "Domain",
+      "description": "A custom domain linked to a site.",
+      "type": "object",
+      "properties": {
+        "domain": { "type": "string" },
+        "linkedSite": { "type": "string" },
+        "expiryDate": { "type": "string", "format": "date-time" },
+        "dnsStatus": { "type": "string", "enum": ["propagated", "pending", "expired"] }
+      },
+      "required": ["domain", "linkedSite", "expiryDate", "dnsStatus"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Billing statement for the user.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["paid", "unpaid", "pending"] },
+        "pdfUrl": { "type": "string", "format": "uri" }
+      },
+      "required": ["date", "amount", "status", "pdfUrl"]
+    }
+  },
+  "auth": {
+    "providers": ["google.com", "password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "#/entities/UserProfile",
+      "description": "Root user profile document"
+    },
+    "/users/{userId}/sites/{siteId}": {
+      "schema": "#/entities/Site",
+      "description": "User's deployed sites"
+    },
+    "/users/{userId}/domains/{domainId}": {
+      "schema": "#/entities/Domain",
+      "description": "User's custom domains"
+    },
+    "/users/{userId}/invoices/{invoiceId}": {
+      "schema": "#/entities/Invoice",
+      "description": "User's billing invoices"
+    }
+  }
+}

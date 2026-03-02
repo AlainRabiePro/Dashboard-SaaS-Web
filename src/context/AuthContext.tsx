@@ -7,7 +7,7 @@ import {
   User, 
   signOut as firebaseSignOut 
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { useAuth as useFirebaseAuth } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { seedMockData } from "@/lib/firestore-service";
 
@@ -26,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const auth = useFirebaseAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth]);
 
   const signOut = async () => {
     await firebaseSignOut(auth);
