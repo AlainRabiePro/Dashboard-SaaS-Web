@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import jsPDF from 'jspdf';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, Download } from 'lucide-react';
 import { useData } from '@/components/data-provider';
+import { useAuth } from '@/components/auth/auth-provider';
 import { PLANS } from '@/lib/plans';
 import { UpgradePlanDialog } from '@/components/dashboard/upgrade-plan-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,11 +20,85 @@ const MOCK_INVOICES = [
     { id: 'INV-001', date: new Date('2024-03-01'), amount: 8.99, status: 'Paid' },
 ];
 
+type Invoice = typeof MOCK_INVOICES[0];
+
 export default function BillingPage() {
   const { subscription } = useData();
+  const { user } = useAuth();
   const [isUpgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
   const currentPlanDetails = subscription ? PLANS.find(p => p.name === subscription.plan) : null;
+
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    const doc = new jsPDF();
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ServerSphere', margin, 30);
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Invoice', pageWidth - margin, 30, { align: 'right' });
+    
+    doc.setLineWidth(0.5);
+    doc.line(margin, 40, pageWidth - margin, 40);
+
+    // Company & Client info
+    doc.setFontSize(11);
+    doc.text('ServerSphere Inc.', margin, 50);
+    doc.text('123 Cloud Ave, Webville', margin, 55);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', pageWidth - margin - 70, 50);
+    doc.setFont('helvetica', 'normal');
+    doc.text(user?.email || 'N/A', pageWidth - margin, 50, { align: 'right' });
+
+
+    // Invoice Details
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Number:', margin, 70);
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoice.id, margin + 40, 70);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Date:', margin, 77);
+    doc.setFont('helvetica', 'normal');
+    doc.text(format(invoice.date, 'MMM d, yyyy'), margin + 40, 77);
+    
+    // Table Header
+    const tableY = 95;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', margin, tableY);
+    doc.text('Amount', pageWidth - margin, tableY, { align: 'right' });
+    doc.line(margin, tableY + 5, pageWidth - margin, tableY + 5);
+
+    // Table Body
+    const itemY = tableY + 15;
+    doc.setFont('helvetica', 'normal');
+    const planName = subscription?.plan || 'Plan';
+    doc.text(`${planName} Plan - Subscription`, margin, itemY);
+    doc.text(`€${invoice.amount.toFixed(2)}`, pageWidth - margin, itemY, { align: 'right' });
+    
+    // Table Footer
+    const totalY = itemY + 20;
+    doc.line(margin, totalY - 5, pageWidth - margin, totalY - 5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Total', margin, totalY + 5);
+    doc.text(`€${invoice.amount.toFixed(2)}`, pageWidth - margin, totalY + 5, { align: 'right' });
+
+    // Footer
+    const footerY = doc.internal.pageSize.getHeight() - 30;
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text('Thank you for your business!', margin, footerY);
+    doc.text('Questions? Contact support@serversphere.com', margin, footerY + 5);
+
+    doc.save(`Invoice-${invoice.id}.pdf`);
+  };
 
   return (
     <>
@@ -61,7 +137,7 @@ export default function BillingPage() {
                                 </Badge>
                             </TableCell>
                             <TableCell>
-                                <Button variant="outline" size="icon">
+                                <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice(invoice)}>
                                     <Download className="h-4 w-4" />
                                     <span className="sr-only">Download invoice</span>
                                 </Button>
