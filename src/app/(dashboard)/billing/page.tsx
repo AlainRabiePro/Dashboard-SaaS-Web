@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getInvoices, getUserProfile, UserProfile, Invoice } from "@/lib/firestore-service";
 import { format } from "date-fns";
-import { FileDown, CreditCard, ShieldCheck, Zap } from "lucide-react";
+import { FileDown, CreditCard } from "lucide-react";
 
 export default function BillingPage() {
   const { user } = useAuth();
@@ -87,35 +87,12 @@ export default function BillingPage() {
         </Card>
 
         <div className="space-y-6">
-          <Card className="bg-primary text-primary-foreground">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 fill-current" />
-                Current Plan
-              </CardTitle>
-              <CardDescription className="text-primary-foreground/70">You are currently on the {profile?.plan}.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">$29</span>
-                  <span className="text-sm">/mo</span>
-                </div>
-                <ul className="text-sm space-y-2">
-                  <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> 10 Active Sites</li>
-                  <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> 10GB SSD Storage</li>
-                  <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Global CDN</li>
-                </ul>
-              </div>
-            </CardContent>
-            <CardFooter className="flex gap-2">
-              <Button variant="secondary" className="flex-1 font-bold">Upgrade</Button>
-            </CardFooter>
-          </Card>
-
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Payment Method</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Payment Method
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-4 p-3 border rounded-lg">
