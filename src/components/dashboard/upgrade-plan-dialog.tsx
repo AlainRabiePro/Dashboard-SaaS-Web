@@ -29,34 +29,33 @@ export function UpgradePlanDialog({ isOpen, setIsOpen }: UpgradePlanDialogProps)
     const [isLoading, setIsLoading] = React.useState<string | null>(null);
     const currentPlanName = subscription?.plan;
 
-    const handlePlanChange = async (plan: typeof PLANS[0]) => {
+    const handlePlanChange = (plan: typeof PLANS[0]) => {
         if (!user || !subscription || plan.name === currentPlanName) return;
     
         setIsLoading(plan.name);
-        try {
-          const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
-          await updateDoc(subscriptionRef, {
-            plan: plan.name,
-            monthlyCost: plan.price,
-            storageLimit: plan.storageLimit,
-            cpuCores: plan.cpuCores,
-            ram: plan.ram,
-          });
-          toast({
-            title: 'Plan Updated!',
-            description: `You are now on the ${plan.name} plan.`,
-          });
-          setIsOpen(false);
-        } catch (error) {
+
+        const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
+        updateDoc(subscriptionRef, {
+          plan: plan.name,
+          monthlyCost: plan.price,
+          storageLimit: plan.storageLimit,
+          cpuCores: plan.cpuCores,
+          ram: plan.ram,
+        }).catch((error) => {
           console.error('Error updating plan:', error);
           toast({
             variant: 'destructive',
             title: 'Update Failed',
             description: 'Could not update your plan. Please try again.',
           });
-        } finally {
-          setIsLoading(null);
-        }
+        });
+        
+        toast({
+          title: 'Plan Updated!',
+          description: `You are now on the ${plan.name} plan.`,
+        });
+        setIsLoading(null);
+        setIsOpen(false);
       };
 
     return (
