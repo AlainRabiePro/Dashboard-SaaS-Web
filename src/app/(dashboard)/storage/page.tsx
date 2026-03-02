@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getUserProfile, getSites, UserProfile, Site } from "@/lib/firestore-service";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { HardDrive, AlertTriangle, TrendingUp, Check, X, Zap } from "lucide-react";
+import { HardDrive, AlertTriangle, TrendingUp, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ import {
 
 const pricingPlans = [
   {
-    name: "Hatchling",
+    name: "HATCHLING",
     price: "29",
     features: [
       { text: "Support Illimité", included: true },
@@ -29,11 +29,11 @@ const pricingPlans = [
       { text: "Intégration Email", included: false },
       { text: "Téléchargement Illimité", included: false },
     ],
-    color: "bg-zinc-800",
-    border: "border-zinc-700"
+    buttonVariant: "default" as const, // Blanc avec texte noir (par défaut dans ce thème)
+    isPopular: false
   },
   {
-    name: "Baby Plan",
+    name: "BABY PLAN",
     price: "69",
     features: [
       { text: "Support Illimité", included: true },
@@ -42,12 +42,11 @@ const pricingPlans = [
       { text: "Intégration Email", included: true },
       { text: "Téléchargement Illimité", included: false },
     ],
-    color: "bg-primary/10",
-    border: "border-primary/50",
-    popular: true
+    buttonVariant: "secondary" as const, // Sombre avec texte blanc
+    isPopular: true
   },
   {
-    name: "Premium",
+    name: "PREMIUM",
     price: "99",
     features: [
       { text: "Support Illimité", included: true },
@@ -56,8 +55,8 @@ const pricingPlans = [
       { text: "Intégration Email", included: true },
       { text: "Téléchargement Illimité", included: true },
     ],
-    color: "bg-zinc-800",
-    border: "border-zinc-700"
+    buttonVariant: "default" as const,
+    isPopular: false
   }
 ];
 
@@ -126,43 +125,41 @@ export default function StoragePage() {
                 <DialogTrigger asChild>
                   <Button className="w-full font-bold shadow-lg shadow-primary/20">Upgrade Storage</Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl bg-zinc-950 border-white/10 p-0 overflow-hidden">
-                  <div className="p-6 md:p-8 space-y-8">
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl text-center font-bold">Choisissez votre plan</DialogTitle>
-                      <DialogDescription className="text-center text-zinc-400">
-                        Optimisez vos performances avec nos solutions de stockage évolutives.
-                      </DialogDescription>
+                <DialogContent className="max-w-5xl bg-zinc-950 border-white/10 p-0 overflow-hidden">
+                  <div className="p-8 md:p-12 space-y-12">
+                    <DialogHeader className="hidden">
+                      <DialogTitle>Plans de stockage</DialogTitle>
+                      <DialogDescription>Choisissez votre plan</DialogDescription>
                     </DialogHeader>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {pricingPlans.map((plan) => (
                         <div 
                           key={plan.name} 
-                          className={`relative flex flex-col p-6 rounded-2xl border ${plan.border} ${plan.color} transition-all hover:scale-[1.02]`}
+                          className={`relative flex flex-col p-8 rounded-[2rem] border border-white/10 bg-zinc-900/30 transition-all hover:bg-zinc-900/50`}
                         >
-                          {plan.popular && (
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider rounded-full">
-                              Recommandé
+                          {plan.isPopular && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-zinc-800 border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full text-zinc-300">
+                              RECOMMANDÉ
                             </div>
                           )}
-                          <div className="text-center mb-6">
-                            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">{plan.name}</h3>
+                          <div className="text-center mb-8">
+                            <h3 className="text-xs font-bold tracking-[0.2em] text-zinc-500 mb-4">{plan.name}</h3>
                             <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-3xl font-bold">${plan.price}</span>
+                              <span className="text-5xl font-bold text-white">${plan.price}</span>
                               <span className="text-zinc-500 text-sm">/ mois</span>
                             </div>
                           </div>
 
-                          <div className="flex-1 space-y-4 mb-8">
+                          <div className="flex-1 space-y-4 mb-10 pt-4">
                             {plan.features.map((feature, i) => (
-                              <div key={i} className="flex items-center gap-3 text-sm">
+                              <div key={i} className="flex items-center gap-4 text-sm">
                                 {feature.included ? (
-                                  <Check className="h-4 w-4 text-primary shrink-0" />
+                                  <Check className="h-4 w-4 text-zinc-400 shrink-0" />
                                 ) : (
-                                  <X className="h-4 w-4 text-zinc-600 shrink-0" />
+                                  <X className="h-4 w-4 text-zinc-700 shrink-0" />
                                 )}
-                                <span className={feature.included ? "text-zinc-200" : "text-zinc-500 line-through"}>
+                                <span className={feature.included ? "text-zinc-300" : "text-zinc-600 line-through decoration-zinc-700"}>
                                   {feature.text}
                                 </span>
                               </div>
@@ -170,10 +167,10 @@ export default function StoragePage() {
                           </div>
 
                           <Button 
-                            variant={plan.popular ? "default" : "outline"} 
-                            className="w-full font-bold uppercase text-[10px] tracking-widest"
+                            variant={plan.buttonVariant} 
+                            className="w-full h-12 font-bold uppercase text-[11px] tracking-[0.15em] rounded-xl"
                           >
-                            Choisir ce plan
+                            CHOISIR CE PLAN
                           </Button>
                         </div>
                       ))}
