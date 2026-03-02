@@ -1,21 +1,7 @@
 export const PLANS = [
   {
-    name: 'Free' as const,
-    price: 0,
-    storageLimit: 5,
-    cpuCores: 1,
-    ram: 1,
-    features: [
-      '5 GB SSD Storage',
-      'Deploy up to 1 project',
-      'Basic Analytics',
-      'Community Support',
-    ],
-    hasToolAccess: false,
-  },
-  {
     name: 'Starter' as const,
-    price: 8.99,
+    price: 4.99,
     storageLimit: 10,
     cpuCores: 2,
     ram: 2,

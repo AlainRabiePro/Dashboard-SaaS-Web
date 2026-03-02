@@ -61,11 +61,11 @@ export function SignupForm() {
       // Create default subscription
       const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
       await setDoc(subscriptionRef, {
-        plan: 'Free',
-        monthlyCost: 0,
-        storageLimit: 5,
-        cpuCores: 1,
-        ram: 1,
+        plan: 'Starter',
+        monthlyCost: 4.99,
+        storageLimit: 10,
+        cpuCores: 2,
+        ram: 2,
       });
 
       // Create default usage stats
@@ -83,7 +83,7 @@ export function SignupForm() {
         domain: 'example.com',
         storageUsed: 1.2,
         status: 'Running',
-        plan: 'Free',
+        plan: 'Starter',
         userId: user.uid,
         createdAt: serverTimestamp(),
       });
