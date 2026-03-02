@@ -15,6 +15,7 @@ import {
   Bot,
   Settings,
   LifeBuoy,
+  Wrench,
 } from 'lucide-react';
 import { Logo } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ const navItems = [
   { href: '/dashboard/projects', icon: HardDrive, label: 'Projects' },
   { href: '/dashboard/billing', icon: CreditCard, label: 'Billing' },
   { href: '/dashboard/assistant', icon: Bot, label: 'AI Assistant' },
+  { href: '/dashboard/tools', icon: Wrench, label: 'Tools' },
 ];
 
 const NavLink = ({ href, icon: Icon, label }: typeof navItems[0]) => {
