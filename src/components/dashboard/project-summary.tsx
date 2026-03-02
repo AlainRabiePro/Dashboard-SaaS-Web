@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import type { Project } from '@/lib/types';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Circle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface ProjectSummaryProps {
   projects: Project[] | undefined;
@@ -20,41 +20,42 @@ export function ProjectSummary({ projects }: ProjectSummaryProps) {
         <CardDescription>A summary of your most recent projects.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-4">
+        <div className="space-y-4">
           {projects !== undefined ? (
              projects.length > 0 ? (
                 projects.map((project) => (
-                  <li key={project.id} className="flex items-center justify-between gap-4">
+                  <div key={project.id} className="flex items-center justify-between gap-4">
                     <div className="grid gap-1">
-                      <p className="font-medium leading-none">{project.name}</p>
+                      <p className="font-semibold leading-none">{project.name}</p>
                       <p className="text-sm text-muted-foreground">{project.domain}</p>
                     </div>
-                    <Badge variant={project.status === 'Running' ? 'default' : 'secondary'} className={`whitespace-nowrap ${project.status === 'Running' ? 'bg-green-600/20 text-green-400 border-green-600/30' : ''}`}>
-                      {project.status}
-                    </Badge>
-                  </li>
+                    <div className="flex items-center gap-2">
+                        <Circle className={cn('h-2 w-2', project.status === 'Running' ? 'fill-green-500 text-green-500' : 'fill-gray-500 text-gray-500')} />
+                        <span className="text-sm text-muted-foreground">{project.status}</span>
+                    </div>
+                  </div>
                 ))
              ) : (
-                <li className="text-center text-muted-foreground">No projects yet.</li>
+                <div className="text-center text-muted-foreground py-4">No projects yet.</div>
              )
           ) : (
             [...Array(3)].map((_, i) => (
-              <li key={i} className="flex items-center justify-between gap-4">
+              <div key={i} className="flex items-center justify-between gap-4">
                 <div className="grid gap-1 w-full">
                   <Skeleton className="h-5 w-1/3" />
                   <Skeleton className="h-4 w-1/2" />
                 </div>
                 <Skeleton className="h-6 w-20 rounded-full" />
-              </li>
+              </div>
             ))
           )}
-        </ul>
+        </div>
       </CardContent>
       <CardFooter>
         <Link href="/dashboard/projects" className="w-full">
-          <Button variant="outline" className="w-full justify-between">
+          <Button variant="outline" className="w-full">
             View All Projects
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="ml-auto h-4 w-4" />
           </Button>
         </Link>
       </CardFooter>

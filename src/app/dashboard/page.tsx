@@ -22,7 +22,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="grid gap-4 md:gap-8">
+      <div className="grid gap-8">
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
           {projects !== undefined ? (
             <StatCard title="Total Projects" value={totalProjects!} icon={HardDrive} />
@@ -31,13 +31,13 @@ export default function DashboardPage() {
           )}
 
           {usage !== undefined ? (
-            <StatCard title="CPU Usage" value={`${usage.cpu}%`} icon={Cpu} />
+            <StatCard title="CPU Usage" value={`${usage.cpu}%`} icon={Cpu} description="Current" />
           ) : (
             <Skeleton className="h-[126px]" />
           )}
           
           {usage !== undefined ? (
-            <StatCard title="RAM Usage" value={`${usage.ram}%`} icon={MemoryStick} />
+            <StatCard title="RAM Usage" value={`${usage.ram}%`} icon={MemoryStick} description="Current" />
           ) : (
             <Skeleton className="h-[126px]" />
           )}
@@ -48,59 +48,60 @@ export default function DashboardPage() {
             <Skeleton className="h-[126px]" />
           )}
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-7">
-          {usage !== undefined ? (
-            <UsageCharts cpuUsage={usage.cpu} ramUsage={usage.ram} />
-          ) : (
-            <Skeleton className="lg:col-span-4 h-[350px]" />
-          )}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle>Subscription</CardTitle>
-              {subscription ? (
-                <CardDescription>Your current plan is <span className="font-bold text-primary">{subscription.plan}</span>.</CardDescription>
-              ) : (
-                <Skeleton className="h-4 w-3/4 mt-1" />
-              )}
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              {subscription && usage ? (
-                <div>
-                  <div className="mb-2 flex justify-between items-baseline">
-                    <p className="text-sm font-medium text-muted-foreground">Storage Usage</p>
-                    <p className="text-sm font-bold">{`${usage.storage.toFixed(1)} GB / ${subscription.storageLimit} GB`}</p>
-                  </div>
-                  <Progress value={storagePercentage} aria-label={`${storagePercentage.toFixed(0)}% storage used`} />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                    <div className="mb-2 flex justify-between items-baseline">
-                        <Skeleton className="h-5 w-24" />
-                        <Skeleton className="h-5 w-20" />
-                    </div>
-                    <Skeleton className="h-4 w-full" />
-                </div>
-              )}
-              {subscription ? (
-                <div className="text-sm text-muted-foreground">
-                    <p>CPU Cores: {subscription.cpuCores}</p>
-                    <p>RAM: {subscription.ram} GB</p>
-                </div>
-              ) : (
-                <div className="space-y-2 mt-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={() => setUpgradeDialogOpen(true)} disabled={!subscription}>Upgrade Plan</Button>
-            </CardFooter>
-          </Card>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:gap-8">
-          <ProjectSummary projects={recentProjects} />
+            {usage !== undefined ? (
+                <UsageCharts />
+            ) : (
+                <Skeleton className="lg:col-span-2 h-[410px]" />
+            )}
+          
+            <div className="lg:col-span-1 flex flex-col gap-8">
+                <ProjectSummary projects={recentProjects} />
+                <Card>
+                    <CardHeader>
+                    <CardTitle>Subscription</CardTitle>
+                    {subscription ? (
+                        <CardDescription>Your current plan is <span className="font-bold text-primary">{subscription.plan}</span>.</CardDescription>
+                    ) : (
+                        <Skeleton className="h-4 w-3/4 mt-1" />
+                    )}
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                    {subscription && usage ? (
+                        <div>
+                        <div className="mb-2 flex justify-between items-baseline">
+                            <p className="text-sm font-medium text-muted-foreground">Storage Usage</p>
+                            <p className="text-sm font-bold">{`${usage.storage.toFixed(1)} GB / ${subscription.storageLimit} GB`}</p>
+                        </div>
+                        <Progress value={storagePercentage} aria-label={`${storagePercentage.toFixed(0)}% storage used`} />
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="mb-2 flex justify-between items-baseline">
+                                <Skeleton className="h-5 w-24" />
+                                <Skeleton className="h-5 w-20" />
+                            </div>
+                            <Skeleton className="h-4 w-full" />
+                        </div>
+                    )}
+                    {subscription ? (
+                        <div className="text-sm text-muted-foreground mt-2">
+                            <p>CPU Cores: {subscription.cpuCores}</p>
+                            <p>RAM: {subscription.ram} GB</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2 mt-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-20" />
+                        </div>
+                    )}
+                    </CardContent>
+                    <CardFooter>
+                    <Button className="w-full" onClick={() => setUpgradeDialogOpen(true)} disabled={!subscription}>Change Plan</Button>
+                    </CardFooter>
+                </Card>
+            </div>
         </div>
       </div>
       <UpgradePlanDialog isOpen={isUpgradeDialogOpen} setIsOpen={setUpgradeDialogOpen} />
