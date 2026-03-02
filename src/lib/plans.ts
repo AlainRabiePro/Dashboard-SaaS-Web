@@ -1,7 +1,7 @@
 export const PLANS = [
   {
     name: 'Starter' as const,
-    price: 4.99,
+    price: 8.99,
     storageLimit: 10,
     cpuCores: 2,
     ram: 2,

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { PLANS } from '@/lib/plans';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -58,14 +59,19 @@ export function SignupForm() {
         displayName: user.email?.split('@')[0] || 'New User',
       });
 
+      const starterPlan = PLANS.find(p => p.name === 'Starter');
+      if (!starterPlan) {
+        throw new Error('Starter plan definition not found.');
+      }
+
       // Create default subscription
       const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
       await setDoc(subscriptionRef, {
-        plan: 'Starter',
-        monthlyCost: 4.99,
-        storageLimit: 10,
-        cpuCores: 2,
-        ram: 2,
+        plan: starterPlan.name,
+        monthlyCost: starterPlan.price,
+        storageLimit: starterPlan.storageLimit,
+        cpuCores: starterPlan.cpuCores,
+        ram: starterPlan.ram,
       });
 
       // Create default usage stats
