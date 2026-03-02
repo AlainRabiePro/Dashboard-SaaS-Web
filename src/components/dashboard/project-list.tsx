@@ -150,7 +150,7 @@ export function ProjectList({ projects, loading }: ProjectListProps) {
                     </TableRow>
                   ))
                 ) : (
-                    <TableRow>
+                    <TableRow key="no-projects">
                         <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                             No projects found.
                         </TableCell>
