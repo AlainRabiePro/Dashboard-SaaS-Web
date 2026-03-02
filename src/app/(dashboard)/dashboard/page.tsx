@@ -1,36 +1,35 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useFirestore, useDoc, useCollection } from "@/firebase";
+import { doc, collection, query, orderBy, limit } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { getUserProfile, getSites, getInvoices, UserProfile, Site, Invoice } from "@/lib/firestore-service";
-import { Globe, HardDrive, Calendar, ArrowUpRight, Activity } from "lucide-react";
+import { Globe, HardDrive, Calendar, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { format } from "date-fns";
+import { UserProfile, Site, Invoice } from "@/lib/firestore-service";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [sites, setSites] = useState<Site[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const firestore = useFirestore();
 
-  useEffect(() => {
-    if (user) {
-      getUserProfile(user.uid).then(setProfile);
-      getSites(user.uid).then(setSites);
-      getInvoices(user.uid).then(setInvoices);
-    }
-  }, [user]);
+  const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
+  const sitesRef = useMemo(() => user ? collection(firestore, "users", user.uid, "sites") : null, [firestore, user]);
+  const invoicesQuery = useMemo(() => user ? query(collection(firestore, "users", user.uid, "invoices"), orderBy("date", "desc"), limit(1)) : null, [firestore, user]);
+
+  const { data: profile } = useDoc<UserProfile>(profileRef);
+  const { data: sites } = useCollection<Site>(sitesRef);
+  const { data: recentInvoices } = useCollection<Invoice>(invoicesQuery);
 
   const activeSitesCount = sites.filter(s => s.status === 'active').length;
-  const nextInvoice = invoices.length > 0 ? invoices[0] : null;
+  const storageLimit = profile?.storageLimit || 10;
+  const storageUsed = 4.2; // Mocked for now
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName || "User"}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName || user?.email?.split('@')[0] || "User"}</h1>
         <p className="text-muted-foreground">Here's what's happening with your account today.</p>
       </div>
 
@@ -51,9 +50,9 @@ export default function DashboardPage() {
             <HardDrive className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4.2 GB / {profile?.storageLimit || 10} GB</div>
+            <div className="text-2xl font-bold">{storageUsed} GB / {storageLimit} GB</div>
             <div className="mt-2 h-2 w-full rounded-full bg-secondary overflow-hidden">
-              <div className="h-full bg-accent" style={{ width: '42%' }}></div>
+              <div className="h-full bg-accent" style={{ width: `${(storageUsed / storageLimit) * 100}%` }}></div>
             </div>
           </CardContent>
         </Card>
@@ -131,13 +130,6 @@ export default function DashboardPage() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">Storage alert: 40% usage reached</p>
                   <p className="text-xs text-muted-foreground">1 day ago</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="mt-1 h-2 w-2 rounded-full bg-muted-foreground/30" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Invoice #INV-2024-001 was paid</p>
-                  <p className="text-xs text-muted-foreground">2 days ago</p>
                 </div>
               </div>
             </div>

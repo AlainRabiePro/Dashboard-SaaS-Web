@@ -30,14 +30,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        await seedMockData(currentUser.uid, currentUser.email || "", currentUser.displayName || "New User");
-      } else {
-        setUser(null);
-      }
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setLoading(false);
+      
+      if (currentUser) {
+        // Run seeding in background to not block the initial UI load
+        seedMockData(currentUser.uid, currentUser.email || "", currentUser.displayName || "New User")
+          .catch(err => console.error("Seeding failed", err));
+      }
     });
 
     return () => unsubscribe();
@@ -50,7 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{ user, loading, signOut }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
