@@ -112,7 +112,7 @@ export function ProjectList({ projects, loading }: ProjectListProps) {
                   ))
               ) : (
                 projects && projects.length > 0 ? (
-                  projects.map((project) => (
+                  projects.filter(p => p && p.id).map((project) => (
                     <TableRow key={project.id}>
                       <TableCell>
                         <div className="font-medium">{project.name}</div>
