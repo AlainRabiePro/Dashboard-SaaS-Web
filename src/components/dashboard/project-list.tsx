@@ -30,9 +30,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProjectListProps {
   projects: Project[] | undefined;
+  loading: boolean;
 }
 
-export function ProjectList({ projects }: ProjectListProps) {
+export function ProjectList({ projects, loading }: ProjectListProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = React.useState(false);
@@ -92,45 +93,7 @@ export function ProjectList({ projects }: ProjectListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects ? (
-                projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell>
-                      <div className="font-medium">{project.name}</div>
-                      <div className="text-sm text-muted-foreground">{project.domain}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={project.status === 'Running' ? 'default' : 'secondary'} className={project.status === 'Running' ? 'bg-green-600/20 text-green-400 border-green-600/30' : ''}>
-                        {project.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{project.storageUsed.toFixed(1)} GB</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {project.createdAt && format(project.createdAt.toDate(), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleStatusToggle(project.id, project.status)}>
-                            {project.status === 'Running' ? <Square className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                            <span>{project.status === 'Running' ? 'Stop' : 'Start'}</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(project.id)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
+              {loading ? (
                 [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
                       <TableCell>
@@ -143,6 +106,52 @@ export function ProjectList({ projects }: ProjectListProps) {
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
+              ) : (
+                projects && projects.length > 0 ? (
+                  projects.map((project) => (
+                    <TableRow key={project.id}>
+                      <TableCell>
+                        <div className="font-medium">{project.name}</div>
+                        <div className="text-sm text-muted-foreground">{project.domain}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={project.status === 'Running' ? 'default' : 'secondary'} className={project.status === 'Running' ? 'bg-green-600/20 text-green-400 border-green-600/30' : ''}>
+                          {project.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{project.storageUsed.toFixed(1)} GB</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {project.createdAt && format(project.createdAt.toDate(), 'MMM d, yyyy')}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Toggle menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleStatusToggle(project.id, project.status)}>
+                              {project.status === 'Running' ? <Square className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                              <span>{project.status === 'Running' ? 'Stop' : 'Start'}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(project.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No projects found.
+                        </TableCell>
+                    </TableRow>
+                )
               )}
             </TableBody>
           </Table>
