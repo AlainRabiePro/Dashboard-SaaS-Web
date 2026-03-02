@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -7,7 +8,7 @@
       "properties": {
         "name": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "plan": { "type": "string", "enum": ["Free Plan", "Pro Plan", "Enterprise"] },
+        "plan": { "type": "string", "enum": ["Starter", "Professional", "Enterprise"] },
         "storageLimit": { "type": "number", "description": "Storage limit in GB" }
       },
       "required": ["name", "email", "plan", "storageLimit"]
@@ -20,9 +21,10 @@
         "name": { "type": "string" },
         "url": { "type": "string", "format": "uri" },
         "status": { "type": "string", "enum": ["active", "suspended"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "storageUsed": { "type": "number", "description": "Storage consumption in GB" }
       },
-      "required": ["name", "url", "status", "createdAt"]
+      "required": ["name", "url", "status", "createdAt", "storageUsed"]
     },
     "Domain": {
       "title": "Domain",

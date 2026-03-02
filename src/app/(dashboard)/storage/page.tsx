@@ -1,12 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useFirestore, useDoc, useCollection } from "@/firebase";
+import { doc, collection } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { getUserProfile, getSites, UserProfile, Site } from "@/lib/firestore-service";
+import { UserProfile, Site } from "@/lib/firestore-service";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { HardDrive, AlertTriangle, TrendingUp, Check, X } from "lucide-react";
 import {
@@ -62,33 +64,32 @@ const pricingPlans = [
 
 export default function StoragePage() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [sites, setSites] = useState<Site[]>([]);
+  const firestore = useFirestore();
 
-  useEffect(() => {
-    if (user) {
-      getUserProfile(user.uid).then(setProfile);
-      getSites(user.uid).then(setSites);
-    }
-  }, [user]);
+  const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
+  const sitesRef = useMemo(() => user ? collection(firestore, "users", user.uid, "sites") : null, [firestore, user]);
 
-  const usedStorage = 4.2; 
-  const totalStorage = profile?.storageLimit || 10;
-  const usagePercentage = (usedStorage / totalStorage) * 100;
+  const { data: profile, loading: profileLoading } = useDoc<UserProfile>(profileRef);
+  const { data: sites, loading: sitesLoading } = useCollection<Site>(sitesRef);
 
-  const chartData = [
-    { name: 'Portfolio', value: 2.1 },
-    { name: 'Personal Blog', value: 1.5 },
-    { name: 'Internal Wiki', value: 0.6 },
-  ];
+  const totalUsed = sites.reduce((acc, site) => acc + (site.storageUsed || 0), 0);
+  const totalLimit = profile?.storageLimit || 0;
+  const usagePercentage = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0;
 
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--foreground)/0.5)', 'hsl(var(--muted-foreground))'];
+  const chartData = sites.map(site => ({
+    name: site.name,
+    value: site.storageUsed || 0
+  })).sort((a, b) => b.value - a.value);
+
+  const COLORS = ['hsl(var(--primary))', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'];
+
+  if (profileLoading || sitesLoading) return null;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Utilisation du Stockage</h1>
-        <p className="text-muted-foreground">Surveillez et faites évoluer vos ressources de stockage.</p>
+        <p className="text-muted-foreground">Surveillez et faites évoluer vos ressources de stockage en temps réel.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -103,10 +104,10 @@ export default function StoragePage() {
           <CardContent className="flex-1 space-y-6 pt-4">
             <div className="space-y-2">
               <div className="flex items-end justify-between">
-                <span className="text-4xl font-bold">{usedStorage} GB</span>
-                <span className="text-muted-foreground text-sm">sur {totalStorage} GB</span>
+                <span className="text-4xl font-bold">{totalUsed.toFixed(1)} GB</span>
+                <span className="text-muted-foreground text-sm">sur {totalLimit} GB</span>
               </div>
-              <Progress value={usagePercentage} className="h-2 bg-zinc-800" />
+              <Progress value={usagePercentage} className="h-2 bg-zinc-900" />
               <p className="text-xs text-muted-foreground">Vous utilisez {usagePercentage.toFixed(1)}% de votre quota actuel.</p>
             </div>
 
@@ -188,24 +189,30 @@ export default function StoragePage() {
               <TrendingUp className="h-5 w-5 text-accent" />
               Répartition par Projet
             </CardTitle>
-            <CardDescription>Usage individuel par application (GB).</CardDescription>
+            <CardDescription>Usage individuel extrait de vos applications réelles.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ left: -20, right: 20 }}>
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} style={{ fontSize: '12px', fill: 'hsl(var(--muted-foreground))' }} />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(255,255,255,0.03)' }} 
-                  contentStyle={{ backgroundColor: '#09090b', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }}
-                />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ left: -20, right: 20 }}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} style={{ fontSize: '10px', fill: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }} />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(255,255,255,0.03)' }} 
+                    contentStyle={{ backgroundColor: '#09090b', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }}
+                  />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Aucune donnée à afficher.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -28,6 +28,7 @@ export interface Site {
   url: string;
   status: 'active' | 'suspended';
   createdAt: any;
+  storageUsed: number;
 }
 
 export interface Domain {
@@ -78,20 +79,6 @@ export async function getSites(uid: string): Promise<Site[]> {
   }
 }
 
-export async function getDomains(uid: string): Promise<Domain[]> {
-  const domainsRef = collection(db, "users", uid, "domains");
-  try {
-    const snapshot = await getDocs(domainsRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Domain));
-  } catch (err) {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: domainsRef.path,
-      operation: 'list'
-    }));
-    return [];
-  }
-}
-
 export async function getInvoices(uid: string): Promise<Invoice[]> {
   const invoicesRef = collection(db, "users", uid, "invoices");
   const q = query(invoicesRef, orderBy("date", "desc"));
@@ -113,7 +100,8 @@ export function addSite(uid: string, name: string, url: string) {
     name,
     url,
     status: 'active' as const,
-    createdAt: Timestamp.now()
+    createdAt: Timestamp.now(),
+    storageUsed: 0.1 // Default initial usage
   };
 
   addDoc(sitesRef, data).catch(async (err) => {
@@ -132,10 +120,7 @@ export async function seedMockData(uid: string, email: string, name: string) {
   try {
     profileSnap = await getDoc(userRef);
   } catch (e) {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: userRef.path,
-      operation: 'get'
-    }));
+    // Already handled in the call or via listener
     return;
   }
 
@@ -143,8 +128,8 @@ export async function seedMockData(uid: string, email: string, name: string) {
     const profileData = {
       name,
       email,
-      plan: 'Pro Plan',
-      storageLimit: 10
+      plan: 'Professional',
+      storageLimit: 15
     };
 
     setDoc(userRef, profileData).catch(async (err) => {
@@ -157,17 +142,12 @@ export async function seedMockData(uid: string, email: string, name: string) {
 
     const sitesRef = collection(db, "users", uid, "sites");
     const sites = [
-      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')) },
-      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')) }
+      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')), storageUsed: 2.1 },
+      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5 },
+      { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6 }
     ];
     for (const site of sites) {
-      addDoc(sitesRef, site).catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: sitesRef.path,
-          operation: 'create',
-          requestResourceData: site
-        }));
-      });
+      addDoc(sitesRef, site).catch(() => {});
     }
 
     const domainsRef = collection(db, "users", uid, "domains");
@@ -176,28 +156,16 @@ export async function seedMockData(uid: string, email: string, name: string) {
       { domain: 'blog-me.com', linkedSite: 'Personal Blog', expiryDate: Timestamp.fromDate(new Date('2024-12-15')), dnsStatus: 'pending' }
     ];
     for (const domain of domains) {
-      addDoc(domainsRef, domain).catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: domainsRef.path,
-          operation: 'create',
-          requestResourceData: domain
-        }));
-      });
+      addDoc(domainsRef, domain).catch(() => {});
     }
 
     const invoicesRef = collection(db, "users", uid, "invoices");
     const invoices = [
-      { date: Timestamp.fromDate(new Date('2024-03-01')), amount: 29.00, status: 'paid', pdfUrl: '#' },
-      { date: Timestamp.fromDate(new Date('2024-02-01')), amount: 29.00, status: 'paid', pdfUrl: '#' }
+      { date: Timestamp.fromDate(new Date('2024-03-01')), amount: 9.99, status: 'paid', pdfUrl: '#' },
+      { date: Timestamp.fromDate(new Date('2024-02-01')), amount: 9.99, status: 'paid', pdfUrl: '#' }
     ];
     for (const invoice of invoices) {
-      addDoc(invoicesRef, invoice).catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: invoicesRef.path,
-          operation: 'create',
-          requestResourceData: invoice
-        }));
-      });
+      addDoc(invoicesRef, invoice).catch(() => {});
     }
   }
 }
