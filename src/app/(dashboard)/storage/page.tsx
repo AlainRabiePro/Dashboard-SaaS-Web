@@ -20,40 +20,40 @@ import {
 
 const pricingPlans = [
   {
-    name: "HATCHLING",
-    price: "29",
+    name: "STARTER",
+    price: "4.99",
     features: [
-      { text: "Support Illimité", included: true },
-      { text: "5GB Espace Serveur", included: true },
-      { text: "2 Utilisateurs", included: true },
-      { text: "Intégration Email", included: false },
-      { text: "Téléchargement Illimité", included: false },
+      { text: "5GB Stockage", included: true },
+      { text: "1 Site Web", included: true },
+      { text: "Déploiement Automatique", included: false },
+      { text: "Intégration AdSense", included: false },
+      { text: "Provisioning Avancé", included: false },
     ],
-    buttonVariant: "default" as const, // Blanc avec texte noir (par défaut dans ce thème)
+    buttonVariant: "default" as const,
     isPopular: false
   },
   {
-    name: "BABY PLAN",
-    price: "69",
+    name: "PROFESSIONAL",
+    price: "9.99",
     features: [
-      { text: "Support Illimité", included: true },
-      { text: "10GB Espace Serveur", included: true },
-      { text: "5 Utilisateurs", included: true },
-      { text: "Intégration Email", included: true },
-      { text: "Téléchargement Illimité", included: false },
+      { text: "15GB Stockage", included: true },
+      { text: "Sites Illimités", included: true },
+      { text: "Déploiement Automatique", included: true },
+      { text: "Intégration AdSense", included: true },
+      { text: "Provisioning Avancé", included: false },
     ],
-    buttonVariant: "secondary" as const, // Sombre avec texte blanc
+    buttonVariant: "secondary" as const,
     isPopular: true
   },
   {
-    name: "PREMIUM",
-    price: "99",
+    name: "ENTERPRISE",
+    price: "16.99",
     features: [
-      { text: "Support Illimité", included: true },
-      { text: "25GB Espace Serveur", included: true },
-      { text: "10 Utilisateurs", included: true },
-      { text: "Intégration Email", included: true },
-      { text: "Téléchargement Illimité", included: true },
+      { text: "Stockage Illimité", included: true },
+      { text: "Sites Illimités", included: true },
+      { text: "Déploiement Automatique", included: true },
+      { text: "Intégration AdSense", included: true },
+      { text: "Provisioning Avancé", included: true },
     ],
     buttonVariant: "default" as const,
     isPopular: false
