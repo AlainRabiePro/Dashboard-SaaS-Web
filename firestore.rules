@@ -1,19 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permet à un utilisateur de gérer uniquement ses propres données
+    // Règle globale pour les données utilisateur
     match /users/{userId} {
+      // L'utilisateur peut lire et écrire son propre profil
       allow read, write: if request.auth != null && request.auth.uid == userId;
       
-      match /sites/{siteId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      match /domains/{domainId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      match /invoices/{invoiceId} {
+      // L'utilisateur peut accéder à toutes ses sous-collections (sites, domaines, factures, etc.)
+      match /{allSubcollections=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
