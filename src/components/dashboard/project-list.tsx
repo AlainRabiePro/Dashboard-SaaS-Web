@@ -22,37 +22,44 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import type { Project } from '@/lib/types';
 import { format } from 'date-fns';
 import { CreateProjectDialog } from './create-project-dialog';
+import { useAuth } from '../auth/auth-provider';
+import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProjectListProps {
   projects: Project[];
 }
 
-export function ProjectList({ projects: initialProjects }: ProjectListProps) {
-  const [projects, setProjects] = React.useState(initialProjects);
+export function ProjectList({ projects }: ProjectListProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = React.useState(false);
 
-  const handleStatusToggle = (projectId: string) => {
-    setProjects(
-      projects.map((p) =>
-        p.id === projectId
-          ? { ...p, status: p.status === 'Running' ? 'Stopped' : 'Running' }
-          : p
-      )
-    );
+  const handleStatusToggle = async (projectId: string, currentStatus: 'Running' | 'Stopped') => {
+    if (!user) return;
+    const projectRef = doc(db, 'users', user.uid, 'projects', projectId);
+    await updateDoc(projectRef, {
+      status: currentStatus === 'Running' ? 'Stopped' : 'Running'
+    });
+    toast({ title: `Project ${currentStatus === 'Running' ? 'stopped' : 'started'}.`})
   };
 
-  const handleDelete = (projectId: string) => {
-    setProjects(projects.filter((p) => p.id !== projectId));
+  const handleDelete = async (projectId: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'users', user.uid, 'projects', projectId));
+    toast({ variant: 'destructive', title: 'Project deleted.'})
   };
   
-  const handleProjectCreated = (newProject: Omit<Project, 'id' | 'userId' | 'createdAt'>) => {
-    const projectToAdd: Project = {
+  const handleProjectCreated = async (newProject: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed'>) => {
+    if (!user) return;
+    const projectsColRef = collection(db, 'users', user.uid, 'projects');
+    await addDoc(projectsColRef, {
         ...newProject,
-        id: `proj-${Math.random().toString(36).substr(2, 9)}`,
-        userId: 'user-123',
-        createdAt: new Date(),
-    };
-    setProjects([projectToAdd, ...projects]);
+        storageUsed: 0,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+    });
   };
 
   return (
@@ -97,7 +104,7 @@ export function ProjectList({ projects: initialProjects }: ProjectListProps) {
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{project.storageUsed.toFixed(1)} GB</TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {format(project.createdAt, 'MMM d, yyyy')}
+                    {project.createdAt && format(project.createdAt.toDate(), 'MMM d, yyyy')}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -108,7 +115,7 @@ export function ProjectList({ projects: initialProjects }: ProjectListProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleStatusToggle(project.id)}>
+                        <DropdownMenuItem onClick={() => handleStatusToggle(project.id, project.status)}>
                           {project.status === 'Running' ? <Square className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
                           <span>{project.status === 'Running' ? 'Stop' : 'Start'}</span>
                         </DropdownMenuItem>

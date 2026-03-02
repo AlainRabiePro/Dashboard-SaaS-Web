@@ -27,7 +27,7 @@ import {
 import { Button } from '../ui/button';
 import { PanelLeft } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { MOCK_SUBSCRIPTION } from '@/lib/data';
+import { useData } from '../data-provider';
 
 
 const navItems = [
@@ -64,7 +64,8 @@ const NavLink = ({ href, icon: Icon, label }: typeof navItems[0]) => {
 };
 
 const NavContent = () => {
-    const hasToolAccess = MOCK_SUBSCRIPTION.plan === 'Pro';
+    const { subscription } = useData();
+    const hasToolAccess = subscription?.plan === 'Pro';
 
     return (
         <>

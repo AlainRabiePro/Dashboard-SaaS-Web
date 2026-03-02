@@ -2,8 +2,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Newspaper, Rocket, History, Settings2, Lock } from 'lucide-react';
 import Link from 'next/link';
-import { MOCK_SUBSCRIPTION } from '@/lib/data';
 import { Button } from '@/components/ui/button';
+import { useData } from '@/components/data-provider';
 
 const tools = [
   {
@@ -37,7 +37,8 @@ const tools = [
 ];
 
 export default function ToolsPage() {
-  const hasAccess = MOCK_SUBSCRIPTION.plan === 'Pro';
+  const { subscription } = useData();
+  const hasAccess = subscription?.plan === 'Pro';
 
   if (!hasAccess) {
     return (

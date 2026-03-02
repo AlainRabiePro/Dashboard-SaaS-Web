@@ -8,10 +8,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './auth-provider';
-import { auth, isFirebaseConfigured } from '@/lib/firebase';
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -46,7 +47,47 @@ export function SignupForm() {
     }
 
     try {
-      await signUp(auth, values.email, values.password);
+      const userCredential = await signUp(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Create user document in Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      await setDoc(userDocRef, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.email?.split('@')[0] || 'New User',
+      });
+
+      // Create default subscription
+      const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
+      await setDoc(subscriptionRef, {
+        plan: 'Free',
+        monthlyCost: 0,
+        storageLimit: 5,
+        cpuCores: 1,
+        ram: 1,
+      });
+
+      // Create default usage stats
+      const usageRef = doc(db, 'users', user.uid, 'usage', 'current');
+      await setDoc(usageRef, {
+        cpu: 15,
+        ram: 25,
+        storage: 1.2,
+      });
+      
+      // Create a sample project
+      const projectsColRef = collection(db, 'users', user.uid, 'projects');
+      await addDoc(projectsColRef, {
+        name: 'My First Project',
+        domain: 'example.com',
+        storageUsed: 1.2,
+        status: 'Running',
+        plan: 'Free',
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+      });
+
       toast({
         title: 'Success',
         description: 'Account created successfully. Welcome!',

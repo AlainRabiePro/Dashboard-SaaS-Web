@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check } from 'lucide-react';
-import { MOCK_SUBSCRIPTION } from '@/lib/data';
+import { useData } from '../data-provider';
 
 const DIALOG_PLANS = [
   {
@@ -53,7 +53,8 @@ interface UpgradePlanDialogProps {
 }
 
 export function UpgradePlanDialog({ isOpen, setIsOpen }: UpgradePlanDialogProps) {
-    const currentPlanName = MOCK_SUBSCRIPTION.plan;
+    const { subscription } = useData();
+    const currentPlanName = subscription?.plan;
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

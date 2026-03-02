@@ -2,8 +2,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MOCK_SUBSCRIPTION } from '@/lib/data';
 import { Check } from 'lucide-react';
+import { useData } from '@/components/data-provider';
 
 const PLANS = [
   {
@@ -46,7 +46,8 @@ const PLANS = [
 ];
 
 export default function BillingPage() {
-  const currentPlanName = MOCK_SUBSCRIPTION.plan;
+  const { subscription } = useData();
+  const currentPlanName = subscription?.plan;
 
   return (
     <div className="grid gap-8">

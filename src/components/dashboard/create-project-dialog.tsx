@@ -38,7 +38,7 @@ import { Loader2, Sparkles } from 'lucide-react';
 interface CreateProjectDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt'>) => void;
+  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed'>) => void;
 }
 
 const formSchema = z.object({
@@ -47,7 +47,6 @@ const formSchema = z.object({
     message: 'Please enter a valid domain.',
   }),
   plan: z.enum(['Free', 'Starter', 'Pro']),
-  storageUsed: z.coerce.number(),
   status: z.enum(['Running', 'Stopped']),
   aiDescription: z.string().optional(),
 });
@@ -63,7 +62,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
       name: '',
       domain: '',
       plan: 'Free',
-      storageUsed: 0,
       status: 'Running',
       aiDescription: '',
     },

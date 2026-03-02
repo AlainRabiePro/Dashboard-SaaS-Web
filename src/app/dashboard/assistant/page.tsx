@@ -4,29 +4,35 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Sparkles, CheckCircle, AlertTriangle, Info } from 'lucide-react';
-import { MOCK_PROJECTS, MOCK_SUBSCRIPTION, MOCK_USAGE } from '@/lib/data';
 import {
   aiPerformanceAssistantRecommendations,
   AiPerformanceAssistantRecommendationsOutput,
 } from '@/ai/flows/ai-performance-assistant-recommendations';
+import { useData } from '@/components/data-provider';
 
 export default function AssistantPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [recommendations, setRecommendations] = React.useState<AiPerformanceAssistantRecommendationsOutput | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const { projects, subscription, usage } = useData();
 
   const handleGetRecommendations = async () => {
+    if (!subscription || !usage) {
+        setError('Could not load user data. Please try again later.');
+        return;
+    }
+
     setIsLoading(true);
     setError(null);
     setRecommendations(null);
 
     try {
       const input = {
-        cpuUsage: MOCK_USAGE.cpu,
-        ramUsage: MOCK_USAGE.ram,
-        storageUsageGB: MOCK_USAGE.storage,
-        currentPlan: MOCK_SUBSCRIPTION.plan,
-        projects: MOCK_PROJECTS.map(p => ({
+        cpuUsage: usage.cpu,
+        ramUsage: usage.ram,
+        storageUsageGB: usage.storage,
+        currentPlan: subscription.plan,
+        projects: projects.map(p => ({
             name: p.name,
             domain: p.domain,
             storageUsedGB: p.storageUsed,

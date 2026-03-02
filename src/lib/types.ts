@@ -6,7 +6,7 @@ export type Project = {
     status: 'Running' | 'Stopped';
     plan: 'Free' | 'Starter' | 'Pro';
     userId: string;
-    createdAt: Date;
+    createdAt: any; // Firestore Timestamp
 };
   
 export type Subscription = {
