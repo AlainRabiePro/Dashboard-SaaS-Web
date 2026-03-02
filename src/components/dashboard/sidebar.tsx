@@ -27,6 +27,7 @@ import {
 import { Button } from '../ui/button';
 import { PanelLeft } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { MOCK_SUBSCRIPTION } from '@/lib/data';
 
 
 const navItems = [
@@ -62,36 +63,42 @@ const NavLink = ({ href, icon: Icon, label }: typeof navItems[0]) => {
   );
 };
 
-const NavContent = () => (
-  <>
-    <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
-      <Link
-        href="/dashboard"
-        className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-card text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
-      >
-        <Logo className="h-5 w-5 text-primary transition-all group-hover:scale-110" />
-        <span className="sr-only">ServerSphere</span>
-      </Link>
-      {navItems.map((item) => (
-        <NavLink key={item.href} {...item} />
-      ))}
-    </nav>
-    <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
-        <Tooltip>
-          <TooltipTrigger asChild>
+const NavContent = () => {
+    const hasToolAccess = MOCK_SUBSCRIPTION.plan !== 'Starter';
+
+    return (
+        <>
+            <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
             <Link
-              href="#"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8"
+                href="/dashboard"
+                className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-card text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
             >
-              <Settings className="h-5 w-5" />
-              <span className="sr-only">Settings</span>
+                <Logo className="h-5 w-5 text-primary transition-all group-hover:scale-110" />
+                <span className="sr-only">ServerSphere</span>
             </Link>
-          </TooltipTrigger>
-          <TooltipContent side="right">Settings</TooltipContent>
-        </Tooltip>
-    </nav>
-  </>
-);
+            {navItems
+                .filter((item) => hasToolAccess || item.href !== '/dashboard/tools')
+                .map((item) => (
+                    <NavLink key={item.href} {...item} />
+            ))}
+            </nav>
+            <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
+                <Tooltip>
+                <TooltipTrigger asChild>
+                    <Link
+                    href="#"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8"
+                    >
+                    <Settings className="h-5 w-5" />
+                    <span className="sr-only">Settings</span>
+                    </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+                </Tooltip>
+            </nav>
+        </>
+    );
+};
 
 
 export function DashboardSidebar() {

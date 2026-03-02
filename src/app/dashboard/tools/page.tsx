@@ -1,7 +1,9 @@
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Newspaper, Rocket, History, Settings2 } from 'lucide-react';
+import { Newspaper, Rocket, History, Settings2, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { MOCK_SUBSCRIPTION } from '@/lib/data';
+import { Button } from '@/components/ui/button';
 
 const tools = [
   {
@@ -35,6 +37,23 @@ const tools = [
 ];
 
 export default function ToolsPage() {
+  const hasAccess = MOCK_SUBSCRIPTION.plan !== 'Starter';
+
+  if (!hasAccess) {
+    return (
+        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 h-full text-center p-8">
+            <Lock className="h-12 w-12 text-primary mb-4" />
+            <h1 className="text-2xl font-bold">Tools Are a Pro Feature</h1>
+            <p className="text-muted-foreground max-w-md mt-2 mb-6">
+              Please upgrade to the Pro plan to get access to Deplora, version history, and other powerful tools.
+            </p>
+            <Link href="/dashboard/billing">
+              <Button>Upgrade Your Plan</Button>
+            </Link>
+        </div>
+    );
+  }
+  
   return (
     <div className="grid gap-8">
       <div>

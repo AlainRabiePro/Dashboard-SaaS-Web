@@ -19,7 +19,7 @@ export default function DashboardPage() {
         <StatCard title="Total Projects" value={totalProjects} icon={HardDrive} />
         <StatCard title="CPU Usage" value={`${MOCK_USAGE.cpu}%`} icon={Cpu} />
         <StatCard title="RAM Usage" value={`${MOCK_USAGE.ram}%`} icon={MemoryStick} />
-        <StatCard title="Monthly Cost" value={`$${MOCK_SUBSCRIPTION.monthlyCost}`} icon={DollarSign} description="Estimated" />
+        <StatCard title="Monthly Cost" value={`€${MOCK_SUBSCRIPTION.monthlyCost.toFixed(2)}`} icon={DollarSign} description="Estimated" />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-7">
         <UsageCharts cpuUsage={MOCK_USAGE.cpu} ramUsage={MOCK_USAGE.ram} />

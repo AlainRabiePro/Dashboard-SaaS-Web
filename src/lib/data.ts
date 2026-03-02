@@ -4,8 +4,8 @@ export const MOCK_USER_ID = 'user-123';
 
 export const MOCK_SUBSCRIPTION: Subscription = {
   plan: 'Pro',
-  monthlyCost: 25,
-  storageLimit: 100,
+  monthlyCost: 13.99,
+  storageLimit: 50,
   cpuCores: 4,
   ram: 8,
 };
