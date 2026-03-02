@@ -2,52 +2,50 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { useData } from '@/components/data-provider';
-
-const PLANS = [
-  {
-    name: 'Free',
-    price: 0,
-    storage: 5,
-    features: [
-      '5 GB SSD Storage',
-      'Deploy up to 1 project',
-      'Basic Analytics',
-      'Community Support',
-    ],
-    hasToolAccess: false,
-  },
-  {
-    name: 'Starter',
-    price: 8.99,
-    storage: 10,
-    features: [
-      '10 GB SSD Storage',
-      'Deploy up to 3 projects',
-      'Basic Analytics',
-      'Email Support',
-    ],
-    hasToolAccess: false,
-  },
-  {
-    name: 'Pro',
-    price: 13.99,
-    storage: 50,
-    features: [
-      '50 GB SSD Storage',
-      'Deploy unlimited projects',
-      'Advanced Analytics',
-      'Priority Support',
-      'Access to "Deplora" and other tools',
-    ],
-    hasToolAccess: true,
-  },
-];
+import { PLANS } from '@/lib/plans';
+import { useAuth } from '@/components/auth/auth-provider';
+import { useToast } from '@/hooks/use-toast';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import React from 'react';
 
 export default function BillingPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const { subscription } = useData();
+  const [isLoading, setIsLoading] = React.useState<string | null>(null);
   const currentPlanName = subscription?.plan;
+
+  const handlePlanChange = async (plan: typeof PLANS[0]) => {
+    if (!user || !subscription || plan.name === currentPlanName) return;
+
+    setIsLoading(plan.name);
+    try {
+      const subscriptionRef = doc(db, 'users', user.uid, 'subscription', 'current');
+      await updateDoc(subscriptionRef, {
+        plan: plan.name,
+        monthlyCost: plan.price,
+        storageLimit: plan.storageLimit,
+        cpuCores: plan.cpuCores,
+        ram: plan.ram,
+      });
+      toast({
+        title: 'Plan Updated!',
+        description: `You are now on the ${plan.name} plan.`,
+      });
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Update Failed',
+        description: 'Could not update your plan. Please try again.',
+      });
+    } finally {
+      setIsLoading(null);
+    }
+  };
 
   return (
     <div className="grid gap-8">
@@ -82,7 +80,14 @@ export default function BillingPage() {
               </ul>
             </CardContent>
             <CardFooter>
-                <Button className="w-full" disabled={plan.name === currentPlanName}>
+                <Button
+                    className="w-full"
+                    disabled={plan.name === currentPlanName || !!isLoading}
+                    onClick={() => handlePlanChange(plan)}
+                >
+                    {isLoading === plan.name ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
                     {plan.name === currentPlanName ? 'Current Plan' : 'Select Plan'}
                 </Button>
             </CardFooter>
