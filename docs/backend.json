@@ -22,9 +22,11 @@
         "url": { "type": "string", "format": "uri" },
         "status": { "type": "string", "enum": ["active", "suspended"] },
         "createdAt": { "type": "string", "format": "date-time" },
-        "storageUsed": { "type": "number", "description": "Storage consumption in GB" }
+        "storageUsed": { "type": "number", "description": "Storage consumption in GB" },
+        "framework": { "type": "string" },
+        "region": { "type": "string" }
       },
-      "required": ["name", "url", "status", "createdAt", "storageUsed"]
+      "required": ["name", "url", "status", "createdAt", "storageUsed", "framework", "region"]
     },
     "Domain": {
       "title": "Domain",
@@ -56,19 +58,19 @@
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": "#/entities/UserProfile",
+      "schema": "#/backend/entities/UserProfile",
       "description": "Root user profile document"
     },
     "/users/{userId}/sites/{siteId}": {
-      "schema": "#/entities/Site",
+      "schema": "#/backend/entities/Site",
       "description": "User's deployed sites"
     },
     "/users/{userId}/domains/{domainId}": {
-      "schema": "#/entities/Domain",
+      "schema": "#/backend/entities/Domain",
       "description": "User's custom domains"
     },
     "/users/{userId}/invoices/{invoiceId}": {
-      "schema": "#/entities/Invoice",
+      "schema": "#/backend/entities/Invoice",
       "description": "User's billing invoices"
     }
   }

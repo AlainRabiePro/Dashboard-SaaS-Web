@@ -4,7 +4,6 @@ import {
   getDoc, 
   setDoc, 
   collection, 
-  getDocs, 
   query, 
   orderBy, 
   addDoc, 
@@ -29,6 +28,8 @@ export interface Site {
   status: 'active' | 'suspended';
   createdAt: any;
   storageUsed: number;
+  framework: string;
+  region: string;
 }
 
 export interface Domain {
@@ -47,68 +48,6 @@ export interface Invoice {
   pdfUrl: string;
 }
 
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const userRef = doc(db, "users", uid);
-  try {
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      return userDoc.data() as UserProfile;
-    }
-    return null;
-  } catch (err) {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: userRef.path,
-      operation: 'get'
-    }));
-    return null;
-  }
-}
-
-export async function getSites(uid: string): Promise<Site[]> {
-  const sitesRef = collection(db, "users", uid, "sites");
-  const q = query(sitesRef, orderBy("createdAt", "desc"));
-  try {
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Site));
-  } catch (err) {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: sitesRef.path,
-      operation: 'list'
-    }));
-    return [];
-  }
-}
-
-export async function getDomains(uid: string): Promise<Domain[]> {
-  const domainsRef = collection(db, "users", uid, "domains");
-  const q = query(domainsRef);
-  try {
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Domain));
-  } catch (err) {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: domainsRef.path,
-      operation: 'list'
-    }));
-    return [];
-  }
-}
-
-export async function getInvoices(uid: string): Promise<Invoice[]> {
-  const invoicesRef = collection(db, "users", uid, "invoices");
-  const q = query(invoicesRef, orderBy("date", "desc"));
-  try {
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Invoice));
-  } catch (err) {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: invoicesRef.path,
-      operation: 'list'
-    }));
-    return [];
-  }
-}
-
 export function addSite(uid: string, name: string, url: string) {
   const sitesRef = collection(db, "users", uid, "sites");
   const data = {
@@ -116,7 +55,9 @@ export function addSite(uid: string, name: string, url: string) {
     url,
     status: 'active' as const,
     createdAt: Timestamp.now(),
-    storageUsed: 0.1 // Default initial usage
+    storageUsed: 0.1,
+    framework: 'Next.js',
+    region: 'us-east-1'
   };
 
   addDoc(sitesRef, data).catch(async (err) => {
@@ -146,7 +87,7 @@ export async function seedMockData(uid: string, email: string, name: string) {
       storageLimit: 15
     };
 
-    setDoc(userRef, profileData).catch(async (err) => {
+    await setDoc(userRef, profileData).catch(async (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: userRef.path,
         operation: 'create',
@@ -156,9 +97,9 @@ export async function seedMockData(uid: string, email: string, name: string) {
 
     const sitesRef = collection(db, "users", uid, "sites");
     const sites = [
-      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')), storageUsed: 2.1 },
-      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5 },
-      { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6 }
+      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')), storageUsed: 2.1, framework: 'Next.js', region: 'us-east-1' },
+      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5, framework: 'React', region: 'eu-west-3' },
+      { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6, framework: 'Vite', region: 'us-west-2' }
     ];
     for (const site of sites) {
       addDoc(sitesRef, site).catch(() => {});
