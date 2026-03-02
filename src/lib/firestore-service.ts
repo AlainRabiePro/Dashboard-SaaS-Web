@@ -37,6 +37,14 @@ export interface Site {
   region: string;
 }
 
+export interface Log {
+  id: string;
+  timestamp: any;
+  level: 'info' | 'warning' | 'error';
+  message: string;
+  source: string;
+}
+
 export interface Domain {
   id: string;
   domain: string;
@@ -65,7 +73,16 @@ export function addSite(uid: string, name: string, url: string) {
     region: 'us-east-1'
   };
 
-  addDoc(sitesRef, data).catch(async (err) => {
+  addDoc(sitesRef, data).then((docRef) => {
+    // Add initial log
+    const logsRef = collection(db, "users", uid, "sites", docRef.id, "logs");
+    addDoc(logsRef, {
+      timestamp: Timestamp.now(),
+      level: 'info',
+      message: 'Project initialized successfully.',
+      source: 'System'
+    });
+  }).catch(async (err) => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: sitesRef.path,
       operation: 'create',
@@ -152,8 +169,21 @@ export async function seedMockData(uid: string, email: string, name: string) {
       { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5, framework: 'React', region: 'eu-west-3' },
       { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6, framework: 'Vite', region: 'us-west-2' }
     ];
+    
     for (const site of sites) {
-      addDoc(sitesRef, site).catch(() => {});
+      const docRef = await addDoc(sitesRef, site);
+      
+      // Add mock logs for each site
+      const logsRef = collection(db, "users", uid, "sites", docRef.id, "logs");
+      const mockLogs = [
+        { timestamp: Timestamp.now(), level: 'info', message: 'Build started...', source: 'Builder' },
+        { timestamp: Timestamp.now(), level: 'info', message: 'Optimizing assets...', source: 'Builder' },
+        { timestamp: Timestamp.now(), level: 'info', message: 'Deployment successful.', source: 'System' },
+        { timestamp: Timestamp.now(), level: 'warning', message: 'Minor latency detected in region.', source: 'Monitor' }
+      ];
+      for (const log of mockLogs) {
+        await addDoc(logsRef, log);
+      }
     }
 
     const domainsRef = collection(db, "users", uid, "domains");

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { addSite, Site } from "@/lib/firestore-service";
-import { ExternalLink, Plus, Settings, Globe, Loader2 } from "lucide-react";
+import { ExternalLink, Plus, Settings, Globe, Loader2, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -129,15 +129,22 @@ export default function SitesPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="bg-white/5 border-t border-white/5 p-3 flex justify-between">
-                <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5" asChild>
-                  <a href={site.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" /> Visiter
-                  </a>
-                </Button>
-                <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5" asChild>
+              <CardFooter className="bg-white/5 border-t border-white/5 p-3 flex flex-wrap gap-2 justify-between">
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5 px-2" asChild>
+                    <a href={site.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-3.5 w-3.5" /> Visiter
+                    </a>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5 px-2" asChild>
+                    <Link href={`/sites/${site.id}/logs`}>
+                      <Terminal className="mr-2 h-3.5 w-3.5 text-emerald-500" /> Logs
+                    </Link>
+                  </Button>
+                </div>
+                <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5 px-2" asChild>
                   <Link href={`/sites/${site.id}/settings`}>
-                    <Settings className="mr-2 h-4 w-4" /> Paramètres
+                    <Settings className="mr-2 h-3.5 w-3.5" /> Paramètres
                   </Link>
                 </Button>
               </CardFooter>

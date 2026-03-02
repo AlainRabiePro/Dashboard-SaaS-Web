@@ -28,6 +28,18 @@
       },
       "required": ["name", "url", "status", "createdAt", "storageUsed", "framework", "region"]
     },
+    "Log": {
+      "title": "Log",
+      "description": "System or application log entry.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "level": { "type": "string", "enum": ["info", "error", "warning"] },
+        "message": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "required": ["timestamp", "level", "message", "source"]
+    },
     "Domain": {
       "title": "Domain",
       "description": "A custom domain linked to a site.",
@@ -64,6 +76,10 @@
     "/users/{userId}/sites/{siteId}": {
       "schema": "#/backend/entities/Site",
       "description": "User's deployed sites"
+    },
+    "/users/{userId}/sites/{siteId}/logs/{logId}": {
+      "schema": "#/backend/entities/Log",
+      "description": "Project logs"
     },
     "/users/{userId}/domains/{domainId}": {
       "schema": "#/backend/entities/Domain",
