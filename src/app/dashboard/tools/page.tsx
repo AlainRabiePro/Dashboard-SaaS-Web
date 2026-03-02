@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 const tools = [
   {
-    title: 'Deploy Site',
+    title: 'Deplora',
     description: 'Deploy a new site or update an existing one from a repository.',
     icon: Rocket,
     href: '#',
