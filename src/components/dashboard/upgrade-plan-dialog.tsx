@@ -64,7 +64,7 @@ export function UpgradePlanDialog({ isOpen, setIsOpen }: UpgradePlanDialogProps)
           <DialogHeader className="p-6 pb-4">
             <DialogTitle className="text-center text-2xl">Choose your plan</DialogTitle>
           </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 pt-0">
             {PLANS.map((plan) => (
               <Card key={plan.name} className={`flex flex-col ${plan.name === currentPlanName ? 'border-primary ring-2 ring-primary' : ''}`}>
                 <CardHeader className="text-center">

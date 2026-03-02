@@ -4,13 +4,13 @@ export type Project = {
     domain: string;
     storageUsed: number; // in GB
     status: 'Running' | 'Stopped';
-    plan: 'Personal' | 'Starter' | 'Pro';
+    plan: 'Starter' | 'Pro';
     userId: string;
     createdAt: any; // Firestore Timestamp
 };
   
 export type Subscription = {
-    plan: 'Personal' | 'Starter' | 'Pro';
+    plan: 'Starter' | 'Pro';
     monthlyCost: number;
     storageLimit: number; // in GB
     cpuCores: number; 

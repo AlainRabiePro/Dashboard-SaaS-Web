@@ -43,7 +43,7 @@ const formSchema = z.object({
   domain: z.string().refine((value) => /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value), {
     message: 'Please enter a valid domain.',
   }),
-  plan: z.enum(['Personal', 'Starter', 'Pro']),
+  plan: z.enum(['Starter', 'Pro']),
   status: z.enum(['Running', 'Stopped']),
 });
 
@@ -56,7 +56,7 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
     defaultValues: {
       name: '',
       domain: '',
-      plan: 'Personal',
+      plan: 'Starter',
       status: 'Running',
     },
   });
@@ -121,7 +121,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Personal">Personal</SelectItem>
                       <SelectItem value="Starter">Starter</SelectItem>
                       <SelectItem value="Pro">Pro</SelectItem>
                     </SelectContent>
