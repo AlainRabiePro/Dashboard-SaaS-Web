@@ -48,9 +48,9 @@ export default function DashboardPage() {
       <div className="grid gap-8">
         <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
             <StatCard title="Total Projects" value={totalProjects} icon={HardDrive} />
-            <StatCard title="CPU Usage" value={usage ? `${usage.cpu}%` : 'N/A'} icon={Cpu} description="Current" />
-            <StatCard title="RAM Usage" value={usage ? `${usage.ram}%` : 'N/A'} icon={MemoryStick} description="Current" />
-            <StatCard title="Monthly Cost" value={subscription ? `€${subscription.monthlyCost.toFixed(2)}` : 'N/A'} icon={DollarSign} description="Estimated" />
+            <StatCard title="CPU Usage" value={usage ? `${usage.cpu}%` : '0%'} icon={Cpu} description="Current" />
+            <StatCard title="RAM Usage" value={usage ? `${usage.ram}%` : '0%'} icon={MemoryStick} description="Current" />
+            <StatCard title="Monthly Cost" value={subscription ? `€${subscription.monthlyCost.toFixed(2)}` : '€0.00'} icon={DollarSign} description="Estimated" />
         </div>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           
@@ -68,14 +68,14 @@ export default function DashboardPage() {
                         <div>
                         <div className="mb-2 flex justify-between items-baseline">
                             <p className="text-sm font-medium text-muted-foreground">Storage Usage</p>
-                            <p className="text-sm font-bold">{usage && subscription ? `${usage.storage.toFixed(1)} GB / ${subscription.storageLimit} GB` : 'N/A'}</p>
+                            <p className="text-sm font-bold">{usage && subscription ? `${usage.storage.toFixed(1)} GB / ${subscription.storageLimit} GB` : '0 GB / 0 GB'}</p>
                         </div>
                         <Progress value={storagePercentage} aria-label={`${storagePercentage.toFixed(0)}% storage used`} />
                         </div>
                     
                         <div className="text-sm text-muted-foreground mt-2">
-                            <p>CPU Cores: {subscription?.cpuCores ?? 'N/A'}</p>
-                            <p>RAM: {subscription?.ram ?? 'N/A'} GB</p>
+                            <p>CPU Cores: {subscription?.cpuCores ?? '0'}</p>
+                            <p>RAM: {subscription?.ram ?? '0'} GB</p>
                         </div>
                     
                     </CardContent>
