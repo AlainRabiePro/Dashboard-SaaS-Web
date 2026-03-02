@@ -31,9 +31,6 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Project } from '@/lib/types';
-import { Textarea } from '../ui/textarea';
-import { aiProjectConfigurator } from '@/ai/flows/ai-project-configurator';
-import { Loader2, Sparkles } from 'lucide-react';
 
 interface CreateProjectDialogProps {
   isOpen: boolean;
@@ -48,14 +45,12 @@ const formSchema = z.object({
   }),
   plan: z.enum(['Personal', 'Starter', 'Pro']),
   status: z.enum(['Running', 'Stopped']),
-  aiDescription: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: CreateProjectDialogProps) {
   const { toast } = useToast();
-  const [isAiLoading, setAiLoading] = React.useState(false);
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -63,7 +58,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
       domain: '',
       plan: 'Personal',
       status: 'Running',
-      aiDescription: '',
     },
   });
 
@@ -77,36 +71,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
     setIsOpen(false);
   };
   
-  const handleAiSuggestion = async () => {
-    const description = form.getValues('aiDescription');
-    if (!description || description.trim().length < 10) {
-      toast({
-        variant: 'destructive',
-        title: 'Description too short',
-        description: 'Please provide a more detailed project description for the AI.',
-      });
-      return;
-    }
-    setAiLoading(true);
-    try {
-      const result = await aiProjectConfigurator({ projectDescription: description });
-      form.setValue('plan', result.suggestedHostingPlan);
-      toast({
-        title: 'AI Suggestion Applied!',
-        description: result.recommendationReasoning,
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'AI Assistant Error',
-        description: 'Could not get AI suggestion. Please try again.',
-      });
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[425px]">
@@ -118,24 +82,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-            <FormField
-              control={form.control}
-              name="aiDescription"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Describe your project (for AI suggestion)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="e.g., A high-traffic e-commerce site with a blog." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <Button type="button" variant="outline" onClick={handleAiSuggestion} disabled={isAiLoading}>
-                {isAiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                Get AI Plan Suggestion
-             </Button>
-
             <FormField
               control={form.control}
               name="name"

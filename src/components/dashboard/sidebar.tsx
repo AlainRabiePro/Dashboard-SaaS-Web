@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   HardDrive,
   CreditCard,
-  Bot,
   Settings,
   LifeBuoy,
   Wrench,
@@ -34,7 +33,6 @@ const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/dashboard/projects', icon: HardDrive, label: 'Projects' },
   { href: '/dashboard/billing', icon: CreditCard, label: 'Billing' },
-  { href: '/dashboard/assistant', icon: Bot, label: 'AI Assistant' },
   { href: '/dashboard/tools', icon: Wrench, label: 'Tools' },
 ];
 

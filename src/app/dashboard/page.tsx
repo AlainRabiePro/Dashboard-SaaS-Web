@@ -5,7 +5,7 @@ import { UsageCharts } from '@/components/dashboard/usage-charts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { DollarSign, HardDrive, Cpu, MemoryStick, ArrowRight, Bot } from 'lucide-react';
+import { DollarSign, HardDrive, Cpu, MemoryStick, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { ProjectSummary } from '@/components/dashboard/project-summary';
 import { useState } from 'react';
@@ -59,25 +59,8 @@ export default function DashboardPage() {
             </CardFooter>
           </Card>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:gap-8">
           <ProjectSummary projects={recentProjects} />
-          <Card className="bg-primary/10 border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base font-medium">AI Performance Assistant</CardTitle>
-                <Bot className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-                <p className="text-sm text-muted-foreground">Get personalized recommendations to optimize your server's performance and reduce costs.</p>
-            </CardContent>
-            <CardFooter>
-                <Link href="/dashboard/assistant" className="w-full">
-                    <Button variant="ghost" className="w-full justify-between hover:bg-primary/20">
-                        Get AI Recommendations
-                        <ArrowRight className="h-4 w-4" />
-                    </Button>
-                </Link>
-            </CardFooter>
-          </Card>
         </div>
       </div>
       <UpgradePlanDialog isOpen={isUpgradeDialogOpen} setIsOpen={setUpgradeDialogOpen} />
