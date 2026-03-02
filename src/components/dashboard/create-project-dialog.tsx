@@ -22,20 +22,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Project } from '@/lib/types';
 
 interface CreateProjectDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed'>) => void;
+  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => void;
 }
 
 const formSchema = z.object({
@@ -43,8 +36,6 @@ const formSchema = z.object({
   domain: z.string().refine((value) => /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value), {
     message: 'Please enter a valid domain.',
   }),
-  plan: z.enum(['Starter', 'Pro']),
-  status: z.enum(['Running', 'Stopped']),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -56,8 +47,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
     defaultValues: {
       name: '',
       domain: '',
-      plan: 'Starter',
-      status: 'Running',
     },
   });
 
@@ -104,27 +93,6 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
                   <FormControl>
                     <Input placeholder="app.example.com" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plan"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plan</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a plan" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Starter">Starter</SelectItem>
-                      <SelectItem value="Pro">Pro</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

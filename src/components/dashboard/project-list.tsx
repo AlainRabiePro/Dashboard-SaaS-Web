@@ -27,6 +27,7 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from '
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useData } from '../data-provider';
 
 interface ProjectListProps {
   projects: Project[] | undefined;
@@ -35,6 +36,7 @@ interface ProjectListProps {
 
 export function ProjectList({ projects, loading }: ProjectListProps) {
   const { user } = useAuth();
+  const { subscription } = useData();
   const { toast } = useToast();
   const [isCreateDialogOpen, setCreateDialogOpen] = React.useState(false);
 
@@ -53,11 +55,13 @@ export function ProjectList({ projects, loading }: ProjectListProps) {
     toast({ variant: 'destructive', title: 'Project deleted.'})
   };
   
-  const handleProjectCreated = async (newProject: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed'>) => {
+  const handleProjectCreated = async (newProjectData: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => {
     if (!user) return;
     const projectsColRef = collection(db, 'users', user.uid, 'projects');
     await addDoc(projectsColRef, {
-        ...newProject,
+        ...newProjectData,
+        plan: subscription?.plan || 'Starter',
+        status: 'Running',
         storageUsed: 0,
         userId: user.uid,
         createdAt: serverTimestamp(),
