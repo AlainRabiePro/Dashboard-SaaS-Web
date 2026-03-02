@@ -1,16 +1,17 @@
 
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
 import { doc, collection } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { UserProfile, Site } from "@/lib/firestore-service";
+import { UserProfile, Site, updateUserPlan } from "@/lib/firestore-service";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { HardDrive, AlertTriangle, TrendingUp, Check, X } from "lucide-react";
+import { HardDrive, AlertTriangle, TrendingUp, Check, X, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +23,9 @@ import {
 
 const pricingPlans = [
   {
-    name: "STARTER",
+    name: "Starter" as const,
     price: "4.99",
+    limit: 5,
     features: [
       { text: "5GB Stockage", included: true },
       { text: "1 Site Web", included: true },
@@ -35,8 +37,9 @@ const pricingPlans = [
     isPopular: false
   },
   {
-    name: "PROFESSIONAL",
+    name: "Professional" as const,
     price: "9.99",
+    limit: 15,
     features: [
       { text: "15GB Stockage", included: true },
       { text: "Sites Illimités", included: true },
@@ -48,10 +51,11 @@ const pricingPlans = [
     isPopular: true
   },
   {
-    name: "ENTERPRISE",
+    name: "Enterprise" as const,
     price: "16.99",
+    limit: 100,
     features: [
-      { text: "Stockage Illimité", included: true },
+      { text: "100GB Stockage", included: true },
       { text: "Sites Illimités", included: true },
       { text: "Déploiement Automatique", included: true },
       { text: "Intégration AdSense", included: true },
@@ -65,6 +69,9 @@ const pricingPlans = [
 export default function StoragePage() {
   const { user } = useAuth();
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const sitesRef = useMemo(() => user ? collection(firestore, "users", user.uid, "sites") : null, [firestore, user]);
@@ -82,6 +89,23 @@ export default function StoragePage() {
   })).sort((a, b) => b.value - a.value);
 
   const COLORS = ['hsl(var(--primary))', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'];
+
+  async function handleSelectPlan(planName: UserProfile['plan'], limit: number) {
+    if (!user) return;
+    setIsUpdating(planName);
+    try {
+      updateUserPlan(user.uid, planName, limit);
+      toast({
+        title: "Plan mis à jour",
+        description: `Vous êtes maintenant sur le plan ${planName}.`,
+      });
+      setIsDialogOpen(false);
+    } catch (e) {
+      // Les erreurs sont gérées par l'ErrorEmitter global, mais on peut notifier l'utilisateur ici aussi
+    } finally {
+      setIsUpdating(null);
+    }
+  }
 
   if (profileLoading || sitesLoading) return null;
 
@@ -108,7 +132,7 @@ export default function StoragePage() {
                 <span className="text-muted-foreground text-sm">sur {totalLimit} GB</span>
               </div>
               <Progress value={usagePercentage} className="h-2 bg-zinc-900" />
-              <p className="text-xs text-muted-foreground">Vous utilisez {usagePercentage.toFixed(1)}% de votre quota actuel.</p>
+              <p className="text-xs text-muted-foreground">Vous utilisez {usagePercentage.toFixed(1)}% de votre quota actuel ({profile?.plan}).</p>
             </div>
 
             <div className="p-5 rounded-xl bg-zinc-900/50 border border-white/5 space-y-4">
@@ -122,7 +146,7 @@ export default function StoragePage() {
                 </div>
               </div>
               
-              <Dialog>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="w-full font-bold shadow-lg shadow-primary/20">Upgrade Storage</Button>
                 </DialogTrigger>
@@ -134,47 +158,52 @@ export default function StoragePage() {
                     </DialogHeader>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {pricingPlans.map((plan) => (
-                        <div 
-                          key={plan.name} 
-                          className={`relative flex flex-col p-8 rounded-[2rem] border border-white/10 bg-zinc-900/30 transition-all hover:bg-zinc-900/50`}
-                        >
-                          {plan.isPopular && (
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-zinc-800 border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full text-zinc-300">
-                              RECOMMANDÉ
-                            </div>
-                          )}
-                          <div className="text-center mb-8">
-                            <h3 className="text-xs font-bold tracking-[0.2em] text-zinc-500 mb-4">{plan.name}</h3>
-                            <div className="flex items-baseline justify-center gap-1">
-                              <span className="text-5xl font-bold text-white">${plan.price}</span>
-                              <span className="text-zinc-500 text-sm">/ mois</span>
-                            </div>
-                          </div>
-
-                          <div className="flex-1 space-y-4 mb-10 pt-4">
-                            {plan.features.map((feature, i) => (
-                              <div key={i} className="flex items-center gap-4 text-sm">
-                                {feature.included ? (
-                                  <Check className="h-4 w-4 text-zinc-400 shrink-0" />
-                                ) : (
-                                  <X className="h-4 w-4 text-zinc-700 shrink-0" />
-                                )}
-                                <span className={feature.included ? "text-zinc-300" : "text-zinc-600 line-through decoration-zinc-700"}>
-                                  {feature.text}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-
-                          <Button 
-                            variant={plan.buttonVariant} 
-                            className="w-full h-12 font-bold uppercase text-[11px] tracking-[0.15em] rounded-xl"
+                      {pricingPlans.map((plan) => {
+                        const isCurrent = profile?.plan === plan.name;
+                        return (
+                          <div 
+                            key={plan.name} 
+                            className={`relative flex flex-col p-8 rounded-[2rem] border border-white/10 bg-zinc-900/30 transition-all hover:bg-zinc-900/50 ${isCurrent ? 'ring-2 ring-primary ring-offset-4 ring-offset-zinc-950' : ''}`}
                           >
-                            CHOISIR CE PLAN
-                          </Button>
-                        </div>
-                      ))}
+                            {plan.isPopular && (
+                              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-zinc-800 border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full text-zinc-300">
+                                RECOMMANDÉ
+                              </div>
+                            )}
+                            <div className="text-center mb-8">
+                              <h3 className="text-xs font-bold tracking-[0.2em] text-zinc-500 mb-4 uppercase">{plan.name}</h3>
+                              <div className="flex items-baseline justify-center gap-1">
+                                <span className="text-5xl font-bold text-white">${plan.price}</span>
+                                <span className="text-zinc-500 text-sm">/ mois</span>
+                              </div>
+                            </div>
+
+                            <div className="flex-1 space-y-4 mb-10 pt-4">
+                              {plan.features.map((feature, i) => (
+                                <div key={i} className="flex items-center gap-4 text-sm">
+                                  {feature.included ? (
+                                    <Check className="h-4 w-4 text-zinc-400 shrink-0" />
+                                  ) : (
+                                    <X className="h-4 w-4 text-zinc-700 shrink-0" />
+                                  )}
+                                  <span className={feature.included ? "text-zinc-300" : "text-zinc-600 line-through decoration-zinc-700"}>
+                                    {feature.text}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+
+                            <Button 
+                              variant={plan.buttonVariant} 
+                              className="w-full h-12 font-bold uppercase text-[11px] tracking-[0.15em] rounded-xl"
+                              onClick={() => handleSelectPlan(plan.name, plan.limit)}
+                              disabled={isCurrent || (isUpdating === plan.name)}
+                            >
+                              {isUpdating === plan.name ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? "PLAN ACTUEL" : "CHOISIR CE PLAN"}
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </DialogContent>

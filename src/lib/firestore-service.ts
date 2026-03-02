@@ -3,6 +3,7 @@ import {
   doc, 
   getDoc, 
   setDoc, 
+  updateDoc,
   collection, 
   query, 
   orderBy, 
@@ -17,7 +18,7 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/e
 export interface UserProfile {
   name: string;
   email: string;
-  plan: string;
+  plan: 'Starter' | 'Professional' | 'Enterprise';
   storageLimit: number;
 }
 
@@ -69,6 +70,19 @@ export function addSite(uid: string, name: string, url: string) {
   });
 }
 
+export function updateUserPlan(uid: string, plan: UserProfile['plan'], storageLimit: number) {
+  const userRef = doc(db, "users", uid);
+  const data = { plan, storageLimit };
+
+  updateDoc(userRef, data).catch(async (err) => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: userRef.path,
+      operation: 'update',
+      requestResourceData: data
+    }));
+  });
+}
+
 export async function seedMockData(uid: string, email: string, name: string) {
   const userRef = doc(db, "users", uid);
   
@@ -83,7 +97,7 @@ export async function seedMockData(uid: string, email: string, name: string) {
     const profileData = {
       name,
       email,
-      plan: 'Professional',
+      plan: 'Professional' as const,
       storageLimit: 15
     };
 

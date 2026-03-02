@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserProfile, Invoice } from "@/lib/firestore-service";
 import { format } from "date-fns";
-import { FileDown, CreditCard, Loader2 } from "lucide-react";
+import { FileDown, CreditCard, Loader2, Calendar } from "lucide-react";
 
 export default function BillingPage() {
   const { user } = useAuth();
@@ -119,10 +119,26 @@ export default function BillingPage() {
              <CardHeader className="pb-3">
                <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary">Aperçu du Plan</CardTitle>
              </CardHeader>
-             <CardContent>
+             <CardContent className="space-y-4">
                <div className="space-y-1">
                  <p className="text-xl font-bold">{profile?.plan || "Chargement..."}</p>
-                 <p className="text-xs text-muted-foreground">Prochaine facturation le 01 Avril</p>
+                 <p className="text-xs text-muted-foreground italic">Prochaine facturation le 01 Avril 2024</p>
+               </div>
+               
+               <div className="pt-4 border-t border-primary/10 space-y-3">
+                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                   <Calendar className="h-3 w-3" /> Prochaines échéances
+                 </p>
+                 <div className="space-y-2">
+                   <div className="flex justify-between text-xs">
+                     <span className="text-muted-foreground">01 Mai 2024</span>
+                     <span className="font-semibold">$9.99</span>
+                   </div>
+                   <div className="flex justify-between text-xs">
+                     <span className="text-muted-foreground">01 Juin 2024</span>
+                     <span className="font-semibold">$9.99</span>
+                   </div>
+                 </div>
                </div>
              </CardContent>
           </Card>
