@@ -34,17 +34,22 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
 
   const sortedProjects = useMemo(() => {
     if (!projects) return undefined;
-    return [...(projects as Project[])].sort((a, b) => {
-        const aHasDate = a.createdAt?.toDate;
-        const bHasDate = b.createdAt?.toDate;
+    
+    const projectsCopy = [...(projects as Project[])];
+    
+    projectsCopy.sort((a, b) => {
+        // Handle cases where createdAt is null, undefined, or a pending server timestamp.
+        const timeA = a.createdAt?.toMillis?.() ?? 0;
+        const timeB = b.createdAt?.toMillis?.() ?? 0;
 
-        if (aHasDate && !bHasDate) return 1;
-        if (!aHasDate && bHasDate) return -1;
-        if (!aHasDate && !bHasDate) return 0;
+        // If a timestamp is pending, its time will be 0. We want pending items to appear first.
+        // We can treat them as "newer" than any existing item by giving them the current time.
+        const effectiveTimeA = timeA === 0 && a.id ? Date.now() : timeA;
+        const effectiveTimeB = timeB === 0 && b.id ? Date.now() : timeB;
         
-        // Both have dates, so we can safely access them
-        return b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime();
+        return effectiveTimeB - effectiveTimeA; // Sort descending
     });
+    return projectsCopy;
   }, [projects]);
 
   const value = useMemo(() => ({

@@ -22,13 +22,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
 import type { Project } from '@/lib/types';
+import { Loader2 } from 'lucide-react';
 
 interface CreateProjectDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => void;
+  onProjectCreated: (project: Omit<Project, 'id' | 'userId' | 'createdAt' | 'storageUsed' | 'plan' | 'status'>) => Promise<void>;
 }
 
 const formSchema = z.object({
@@ -41,7 +41,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: CreateProjectDialogProps) {
-  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -50,14 +50,18 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
     },
   });
 
-  const onSubmit = (values: FormData) => {
-    onProjectCreated(values);
-    toast({
-      title: 'Project Created',
-      description: `Your new project "${values.name}" has been created.`,
-    });
-    form.reset();
-    setIsOpen(false);
+  const onSubmit = async (values: FormData) => {
+    setIsSubmitting(true);
+    try {
+      await onProjectCreated(values);
+      form.reset();
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Failed to create project:", error);
+      // Optionally, show a toast message here
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   return (
@@ -98,7 +102,11 @@ export function CreateProjectDialog({ isOpen, setIsOpen, onProjectCreated }: Cre
               )}
             />
             <DialogFooter>
-              <Button type="submit">Create Project</Button>
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} disabled={isSubmitting}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Project
+              </Button>
             </DialogFooter>
           </form>
         </Form>
