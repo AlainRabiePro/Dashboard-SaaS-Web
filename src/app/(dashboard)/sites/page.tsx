@@ -13,6 +13,7 @@ import { addSite, Site } from "@/lib/firestore-service";
 import { ExternalLink, Plus, Settings, Globe, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import Link from "next/link";
 
 export default function SitesPage() {
   const { user } = useAuth();
@@ -134,8 +135,10 @@ export default function SitesPage() {
                     <ExternalLink className="mr-2 h-4 w-4" /> Visiter
                   </a>
                 </Button>
-                <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5">
-                  <Settings className="mr-2 h-4 w-4" /> Paramètres
+                <Button variant="ghost" size="sm" className="text-xs hover:bg-white/5" asChild>
+                  <Link href={`/sites/${site.id}/settings`}>
+                    <Settings className="mr-2 h-4 w-4" /> Paramètres
+                  </Link>
                 </Button>
               </CardFooter>
             </Card>

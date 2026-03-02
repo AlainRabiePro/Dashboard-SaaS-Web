@@ -4,8 +4,10 @@ import {
   getDoc, 
   setDoc, 
   updateDoc,
+  deleteDoc,
   collection, 
   query, 
+  getDocs,
   orderBy, 
   addDoc, 
   Timestamp,
@@ -68,6 +70,27 @@ export function addSite(uid: string, name: string, url: string) {
       path: sitesRef.path,
       operation: 'create',
       requestResourceData: data
+    }));
+  });
+}
+
+export function updateSite(uid: string, siteId: string, data: Partial<Site>) {
+  const siteRef = doc(db, "users", uid, "sites", siteId);
+  updateDoc(siteRef, data).catch(async (err) => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: siteRef.path,
+      operation: 'update',
+      requestResourceData: data
+    }));
+  });
+}
+
+export function deleteSite(uid: string, siteId: string) {
+  const siteRef = doc(db, "users", uid, "sites", siteId);
+  deleteDoc(siteRef).catch(async (err) => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: siteRef.path,
+      operation: 'delete'
     }));
   });
 }
