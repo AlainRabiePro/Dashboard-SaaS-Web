@@ -167,10 +167,10 @@ export default function SiteSettingsPage() {
                     value={formData.framework} 
                     onValueChange={(v) => setFormData({...formData, framework: v})}
                   >
-                    <SelectTrigger className="bg-zinc-900 border-white/5">
+                    <SelectTrigger className="bg-zinc-900 border-white/5 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-foreground">
+                    <SelectContent className="bg-zinc-900 border-white/10">
                       <SelectItem value="Next.js">Next.js</SelectItem>
                       <SelectItem value="React">React</SelectItem>
                       <SelectItem value="Vue.js">Vue.js</SelectItem>
@@ -185,10 +185,10 @@ export default function SiteSettingsPage() {
                     value={formData.region} 
                     onValueChange={(v) => setFormData({...formData, region: v})}
                   >
-                    <SelectTrigger className="bg-zinc-900 border-white/5">
+                    <SelectTrigger className="bg-zinc-900 border-white/5 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-foreground">
+                    <SelectContent className="bg-zinc-900 border-white/10">
                       <SelectItem value="us-east-1">US East (N. Virginia)</SelectItem>
                       <SelectItem value="eu-west-3">Europe (Paris)</SelectItem>
                       <SelectItem value="eu-central-1">Europe (Frankfurt)</SelectItem>
