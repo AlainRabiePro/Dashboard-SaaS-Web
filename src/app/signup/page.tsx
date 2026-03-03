@@ -1,7 +1,15 @@
+'use client';
+
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { SignupForm } from '@/components/auth/signup-form';
 import { Logo } from '@/components/icons';
+import { Loader2 } from 'lucide-react';
+
+const SignupForm = dynamic(() => import('@/components/auth/signup-form').then(mod => ({ default: mod.SignupForm })), {
+  loading: () => <Loader2 className="h-6 w-6 animate-spin" />,
+  ssr: false,
+});
 
 export default function SignupPage() {
   return (

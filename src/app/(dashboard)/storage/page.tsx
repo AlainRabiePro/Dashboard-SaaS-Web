@@ -1,14 +1,15 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, collection } from "firebase/firestore";
+import { doc, collection, updateDoc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { UserProfile, Site, updateUserPlan } from "@/lib/firestore-service";
+import { formatStorage } from "@/lib/format-storage";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { HardDrive, AlertTriangle, TrendingUp, Check, X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -72,12 +73,70 @@ export default function StoragePage() {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCalculatingStorage, setIsCalculatingStorage] = useState(false);
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const sitesRef = useMemo(() => user ? collection(firestore, "users", user.uid, "sites") : null, [firestore, user]);
 
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(profileRef);
   const { data: sites, loading: sitesLoading } = useCollection<Site>(sitesRef);
+
+  // Récupérer le stockage réel de l'API et mettre à jour Firestore
+  useEffect(() => {
+    if (!user || !firestore || sites.length === 0 || !profile) return;
+
+    const fetchRealStorage = async () => {
+      try {
+        setIsCalculatingStorage(true);
+        const token = await user.getIdToken();
+
+        // Préparer les données à envoyer
+        const siteNames = sites.map(s => s.name);
+
+        const response = await fetch("/api/calculate-storage", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            siteNames: siteNames,
+            plan: profile.plan || 'basic',
+          }),
+        });
+
+        if (!response.ok) {
+          console.warn("Erreur lors du calcul du stockage");
+          setIsCalculatingStorage(false);
+          return;
+        }
+
+        const data = await response.json();
+        const storageData = data.storage || {};
+
+        // Mettre à jour Firestore pour chaque site
+        for (const site of sites) {
+          const domainKey = site.name.toLowerCase().replace(/\./g, "-");
+          const realStorageGB = storageData[domainKey] || 0;
+
+          if (realStorageGB !== site.storageUsed) {
+            const siteRef = doc(firestore, "users", user.uid, "sites", site.id);
+            await updateDoc(siteRef, {
+              storageUsed: realStorageGB,
+              lastStorageCheck: new Date(),
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de la récupération du stockage:", error);
+      } finally {
+        setIsCalculatingStorage(false);
+      }
+    };
+
+    fetchRealStorage();
+  }, [user, firestore, sites, profile]);
 
   const totalUsed = sites.reduce((acc, site) => acc + (site.storageUsed || 0), 0);
   const totalLimit = profile?.storageLimit || 0;
@@ -130,7 +189,7 @@ export default function StoragePage() {
           <CardContent className="flex-1 space-y-6 pt-4">
             <div className="space-y-2">
               <div className="flex items-end justify-between">
-                <span className="text-4xl font-bold">{totalUsed.toFixed(1)} GB</span>
+                <span className="text-4xl font-bold">{formatStorage(totalUsed)}</span>
                 <span className="text-muted-foreground text-sm">sur {totalLimit} GB</span>
               </div>
               <Progress value={usagePercentage} className="h-2 bg-zinc-900" />
@@ -225,25 +284,49 @@ export default function StoragePage() {
             <CardDescription>Usage individuel extrait de vos applications réelles.</CardDescription>
           </CardHeader>
           <CardContent className="flex-1 min-h-[300px]">
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical" margin={{ left: -20, right: 20 }}>
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} style={{ fontSize: '10px', fill: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(255,255,255,0.03)' }} 
-                    contentStyle={{ backgroundColor: '#09090b', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }}
-                  />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            {sites.length > 0 ? (
+              <div className="space-y-6">
+                {chartData.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height={Math.max(200, sites.length * 40)}>
+                      <BarChart data={chartData} layout="vertical" margin={{ left: 100, right: 20 }}>
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} style={{ fontSize: '10px', fill: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }} />
+                        <Tooltip 
+                          cursor={{ fill: 'rgba(255,255,255,0.03)' }} 
+                          contentStyle={{ backgroundColor: '#09090b', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }}
+                          formatter={(value) => [formatStorage(value as number), 'Utilisation']}
+                        />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    
+                    {/* Tableau détaillé */}
+                    <div className="mt-6 pt-6 border-t border-white/5">
+                      <h4 className="text-sm font-semibold mb-3">Détail par projet</h4>
+                      <div className="space-y-2">
+                        {chartData.map((site) => (
+                          <div key={site.name} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                            <span className="text-sm">{site.name}</span>
+                            <span className="text-sm font-semibold text-primary">{formatStorage(site.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    {isCalculatingStorage ? "Calcul du stockage en cours..." : "Vos projets n'utilisent pas encore d'espace de stockage."}
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Aucune donnée à afficher.
+                Aucun projet trouvé. Créez un projet pour voir l'utilisation.
               </div>
             )}
           </CardContent>

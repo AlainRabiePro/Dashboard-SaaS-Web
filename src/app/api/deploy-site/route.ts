@@ -65,8 +65,11 @@ async function deploySiteOnVPS(userId: string, siteName: string): Promise<boolea
       password: process.env.DEPLOY_SSH_PASSWORD,
     });
 
+    // Normaliser le nom du dossier : "instacraft.fr" -> "instacraft-fr"
+    const folderName = siteName.toLowerCase().replace(/\./g, '-');
+    
     // Créer le dossier du site
-    const siteDir = `/var/www/users/${userId}/sites/${siteName}`;
+    const siteDir = `/var/www/users/${userId}/sites/${folderName}`;
     await ssh.execCommand(`mkdir -p ${siteDir}/public`);
     
     // Créer un fichier index.html basique
@@ -100,7 +103,7 @@ EOF`);
     const nginxConfigContent = `server {
     listen 80;
     server_name ${siteName};
-    root /var/www/users/${userId}/sites/${siteName}/public;
+    root /var/www/users/${userId}/sites/${folderName}/public;
     index index.html;
     
     location / {

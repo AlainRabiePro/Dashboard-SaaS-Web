@@ -31,6 +31,7 @@ export default function SitesPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteUrl, setNewSiteUrl] = useState("");
+  const [newDomain, setNewDomain] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
   const canAddSite = profile?.plan !== 'Starter' || sites.length < 1;
@@ -49,6 +50,7 @@ export default function SitesPage() {
         },
         body: JSON.stringify({
           siteName: newSiteName,
+          domain: newDomain,
         }),
       });
 
@@ -57,10 +59,24 @@ export default function SitesPage() {
         throw new Error(error.message || "Erreur lors du déploiement");
       }
 
+      const deployData = await deployResponse.json();
+
+      // Extraire le domaine de l'URL si pas de domaine custom
+      let finalDomain = newDomain;
+      if (!finalDomain && newSiteUrl) {
+        try {
+          const urlObj = new URL(newSiteUrl);
+          finalDomain = urlObj.hostname;
+        } catch (e) {
+          finalDomain = newSiteUrl;
+        }
+      }
+
       // Ensuite ajouter dans Firestore
-      await addSite(user.uid, newSiteName, newSiteUrl);
+      await addSite(user.uid, newSiteName, newSiteUrl, undefined, finalDomain);
       setNewSiteName("");
       setNewSiteUrl("");
+      setNewDomain("");
       setIsOpen(false);
     } catch (error) {
       console.error("Erreur lors de l'ajout du site:", error);
@@ -119,6 +135,24 @@ export default function SitesPage() {
                     onChange={(e) => setNewSiteUrl(e.target.value)}
                     className="bg-zinc-900 border-white/5"
                   />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Domaine personnalisé (optionnel)</label>
+                  <Input 
+                    placeholder="laisser vide pour utiliser le domaine officiel" 
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                    className="bg-zinc-900 border-white/5"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {newDomain ? `Domaine personnalisé: ${newDomain}` : newSiteUrl ? (() => {
+                      try {
+                        return `Domaine auto-détecté: ${new URL(newSiteUrl).hostname}`;
+                      } catch {
+                        return "URL invalide";
+                      }
+                    })() : "Remplissez l'URL pour voir le domaine détecté"}
+                  </p>
                 </div>
               </div>
             )}

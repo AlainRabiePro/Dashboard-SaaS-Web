@@ -64,8 +64,11 @@ async function deleteSiteFromVPS(userId: string, siteName: string): Promise<bool
       password: process.env.DEPLOY_SSH_PASSWORD,
     });
 
+    // Normaliser le nom du dossier : "instacraft.fr" -> "instacraft-fr"
+    const folderName = siteName.toLowerCase().replace(/\./g, '-');
+
     // 1. Trouver le dossier réel du site (en cas de lien symbolique)
-    const siteLink = `/var/www/users/${userId}/sites/${siteName}`;
+    const siteLink = `/var/www/users/${userId}/sites/${folderName}`;
     console.log(`1️⃣ Récupération du dossier réel...`);
     const readlinkResult = await ssh.execCommand(`readlink -f ${siteLink} 2>/dev/null || echo ${siteLink}`);
     const realSiteDir = readlinkResult.stdout.trim();
@@ -94,13 +97,8 @@ async function deleteSiteFromVPS(userId: string, siteName: string): Promise<bool
 
     // 5. Supprimer les logs nginx du site
     console.log(`4️⃣ Suppression des logs nginx...`);
-    await ssh.execCommand(`rm -f /var/log/nginx/${siteName}_access.log*`);
-    await ssh.execCommand(`rm -f /var/log/nginx/${siteName}_error.log*`);
-    
-    // Supprimer aussi avec le format formaté (tirets au lieu de points)
-    const formattedName = siteName.toLowerCase().replace(/\./g, '-');
-    await ssh.execCommand(`rm -f /var/log/nginx/${formattedName}_access.log*`);
-    await ssh.execCommand(`rm -f /var/log/nginx/${formattedName}_error.log*`);
+    await ssh.execCommand(`rm -f /var/log/nginx/${folderName}_access.log*`);
+    await ssh.execCommand(`rm -f /var/log/nginx/${folderName}_error.log*`);
 
     // 6. Supprimer les fichiers nginx
     const nginxEnabled = `/etc/nginx/sites-enabled/${siteName}`;
@@ -108,11 +106,6 @@ async function deleteSiteFromVPS(userId: string, siteName: string): Promise<bool
     
     console.log(`5️⃣ Suppression config nginx...`);
     await ssh.execCommand(`rm -f ${nginxEnabled} ${nginxConfig}`);
-    
-    // Vérifier aussi avec le format formaté
-    const nginxEnabledFormatted = `/etc/nginx/sites-enabled/${formattedName}`;
-    const nginxConfigFormatted = `/etc/nginx/sites-available/${formattedName}`;
-    await ssh.execCommand(`rm -f ${nginxEnabledFormatted} ${nginxConfigFormatted}`);
 
     // 7. Test nginx
     console.log(`6️⃣ Test configuration nginx...`);

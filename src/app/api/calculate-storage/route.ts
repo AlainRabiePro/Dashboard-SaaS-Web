@@ -16,7 +16,8 @@ async function calculateStorageForUser(
   siteNames: string[],
   storageLimit: number
 ): Promise<{ [domain: string]: number; totalGB: number; limitGB: number }> {
-  const NodeSSH = require('node-ssh').NodeSSH;
+  // Import dynamique pour éviter le bundling côté client
+  const { NodeSSH } = require('node-ssh');
   const ssh = new NodeSSH();
 
   try {
@@ -45,51 +46,42 @@ async function calculateStorageForUser(
       readyTimeout: 30000,
     });
 
-    // Construire la commande avec SEULEMENT les sites de cet utilisateur
-    // Les sites sont maintenant dans /var/www/users/{userId}/sites/
-    const domainPaths = siteNames
-      .map(name => `/var/www/users/${userId}/sites/${name}`)
-      .join(' ');
-    const command = `du -sh ${domainPaths} 2>/dev/null | awk '{print $2 ":" $1}'`;
-    const result = await ssh.execCommand(command);
-
     const storageMap: { [domain: string]: number } = {};
     let totalGB = 0;
 
-    if (result.code === 0 && result.stdout) {
-      const lines = result.stdout.trim().split('\n');
-      lines.forEach((line: string) => {
-        const [path, size] = line.split(':');
-        if (path && size) {
-          const domain = path.split('/').filter(Boolean).pop();
-          if (domain) {
-            let sizeNum = parseFloat(size);
-            if (size.includes('K')) {
-              sizeNum = sizeNum / 1024 / 1024;
-            } else if (size.includes('M')) {
-              sizeNum = sizeNum / 1024;
-            } else if (size.includes('G')) {
-              sizeNum = sizeNum;
-            }
-            const sizeGB = parseFloat(sizeNum.toFixed(2));
-            storageMap[domain] = sizeGB;
-            totalGB += sizeGB;
-          }
-        }
-      });
+    // Pour chaque site, calculer sa taille en convertissant le nom du site en chemin VPS
+    for (const siteName of siteNames) {
+      // Transformer le nom du site en chemin VPS
+      // "instacraft.fr" -> "instacraft-fr"
+      const siteDir = `/var/www/users/${userId}/sites/${siteName.toLowerCase().replace(/\./g, '-')}`;
+      
+      // Utiliser du -sb pour obtenir la taille en bytes
+      const result = await ssh.execCommand(`du -sb "${siteDir}" 2>/dev/null | awk '{print $1}'`);
+      
+      if (result.code === 0 && result.stdout) {
+        const bytes = parseInt(result.stdout.trim());
+        const gb = bytes / (1024 * 1024 * 1024); // Convertir en GB
+        // Garder la vraie valeur même si elle est très petite (jusqu'à 8 décimales)
+        storageMap[siteName] = parseFloat(gb.toFixed(8));
+        console.log(`📊 ${siteName}: ${gb.toFixed(8)} GB (${bytes} bytes)`);
+      } else {
+        storageMap[siteName] = 0;
+        console.log(`⚠️ ${siteName}: Répertoire non trouvé à ${siteDir}`);
+      }
     }
 
     const limitGB = storageLimit;
+    totalGB = Object.values(storageMap).reduce((a, b) => a + b, 0);
 
     console.log(`Storage for user ${userId}:`, {
       storageMap,
-      totalGB: parseFloat(totalGB.toFixed(2)),
+      totalGB: parseFloat(totalGB.toFixed(8)),
       limitGB,
     });
 
     return {
       ...storageMap,
-      totalGB: parseFloat(totalGB.toFixed(2)),
+      totalGB: parseFloat(totalGB.toFixed(8)),
       limitGB,
     };
   } finally {

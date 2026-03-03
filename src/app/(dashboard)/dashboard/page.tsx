@@ -21,6 +21,7 @@ import {
   Zap
 } from "lucide-react";
 import { UserProfile, Site, Invoice } from "@/lib/firestore-service";
+import { formatStorage } from "@/lib/format-storage";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -151,7 +152,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{storageLimit} GB</div>
-            <p className="text-xs text-muted-foreground mt-2">{totalUsed.toFixed(1)} GB utilisés</p>
+            <p className="text-xs text-muted-foreground mt-2">{formatStorage(totalUsed)} utilisés</p>
           </CardContent>
         </Card>
         <Card className="bg-zinc-950/50 border-white/5 backdrop-blur-sm">

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Site, updateSite, deleteSite } from "@/lib/firestore-service";
+import { formatStorage } from "@/lib/format-storage";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { 
@@ -318,7 +319,7 @@ export default function SiteSettingsPage() {
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Utilisation stockage</span>
-                  <span className="font-semibold">{site?.storageUsed?.toFixed(2)} GB</span>
+                  <span className="font-semibold">{formatStorage(site?.storageUsed || 0)}</span>
                 </div>
              </CardContent>
           </Card>

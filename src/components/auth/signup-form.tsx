@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './auth-provider';
-import { auth, db, isFirebaseConfigured } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -36,16 +36,6 @@ export function SignupForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    
-    if (!isFirebaseConfigured) {
-        toast({
-          variant: 'destructive',
-          title: 'Firebase Not Configured',
-          description: "Please add your Firebase project's web app configuration to the .env file.",
-        });
-        setIsLoading(false);
-        return;
-    }
 
     try {
       const userCredential = await signUp(auth, values.email, values.password);

@@ -62,7 +62,7 @@ export interface Invoice {
   pdfUrl: string;
 }
 
-export function addSite(uid: string, name: string, url: string, repositoryUrl?: string) {
+export function addSite(uid: string, name: string, url: string, repositoryUrl?: string, domain?: string) {
   const sitesRef = collection(db, "users", uid, "sites");
   const data = {
     name,
@@ -83,9 +83,33 @@ export function addSite(uid: string, name: string, url: string, repositoryUrl?: 
       message: `Project initialized successfully with repo: ${repositoryUrl || 'N/A'}.`,
       source: 'System'
     });
+
+    // Créer automatiquement un domaine pour ce site
+    if (domain) {
+      addDomain(uid, domain, docRef.id);
+    }
   }).catch(async (err) => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: sitesRef.path,
+      operation: 'create',
+      requestResourceData: data
+    }));
+  });
+}
+
+export function addDomain(uid: string, domainName: string, siteId: string) {
+  const domainsRef = collection(db, "users", uid, "domains");
+  const data = {
+    domain: domainName,
+    linkedSite: siteId,
+    dnsStatus: 'propagated' as const,
+    expiryDate: Timestamp.fromDate(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)), // 1 an
+    createdAt: Timestamp.now(),
+  };
+
+  addDoc(domainsRef, data).catch(async (err) => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: domainsRef.path,
       operation: 'create',
       requestResourceData: data
     }));

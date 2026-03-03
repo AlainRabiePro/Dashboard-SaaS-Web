@@ -30,6 +30,21 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Marquer node-ssh comme module externe (ne pas bundler)
+    if (config.externals) {
+      config.externals.push({
+        'node-ssh': 'node-ssh',
+        'ssh2': 'ssh2'
+      });
+    } else {
+      config.externals = [{
+        'node-ssh': 'node-ssh',
+        'ssh2': 'ssh2'
+      }];
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
