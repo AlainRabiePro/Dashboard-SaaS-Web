@@ -83,7 +83,6 @@ export default function StoragePage() {
   const totalLimit = profile?.storageLimit || 0;
   const usagePercentage = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0;
 
-  // Afficher l'alerte si l'utilisation dépasse 80% et qu'un plan supérieur existe
   const showStorageWarning = usagePercentage >= 80 && profile?.plan !== 'Enterprise';
 
   const chartData = sites.map(site => ({

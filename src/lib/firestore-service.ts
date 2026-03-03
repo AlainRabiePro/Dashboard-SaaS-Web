@@ -74,7 +74,6 @@ export function addSite(uid: string, name: string, url: string) {
   };
 
   addDoc(sitesRef, data).then((docRef) => {
-    // Add initial log
     const logsRef = collection(db, "users", uid, "sites", docRef.id, "logs");
     addDoc(logsRef, {
       timestamp: Timestamp.now(),
@@ -173,7 +172,6 @@ export async function seedMockData(uid: string, email: string, name: string) {
     for (const site of sites) {
       const docRef = await addDoc(sitesRef, site);
       
-      // Add mock logs for each site
       const logsRef = collection(db, "users", uid, "sites", docRef.id, "logs");
       const mockLogs = [
         { timestamp: Timestamp.now(), level: 'info', message: 'Build started...', source: 'Builder' },
