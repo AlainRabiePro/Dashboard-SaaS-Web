@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 interface ConfigureAdsenseRequest {
   siteId: string;
+  userId: string;
   domain: string;
   adsenseId: string;
 }
 
-async function configureAdsenseViaSsh(domain: string, adsenseId: string): Promise<string> {
+async function configureAdsenseViaSsh(domain: string, userId: string, adsenseId: string): Promise<string> {
   const NodeSSH = require('node-ssh').NodeSSH;
   
   const ssh = new NodeSSH();
@@ -38,7 +39,16 @@ async function configureAdsenseViaSsh(domain: string, adsenseId: string): Promis
     });
 
     const siteName = domain.replace(/\./g, '-');
-    const siteDir = `/var/www/${siteName}`;
+    // Utiliser la nouvelle structure avec userId
+    const siteDirNew = `/var/www/users/${userId}/sites/${siteName}`;
+    const siteDirLegacy = `/var/www/${siteName}`;
+    
+    // Déterminer le chemin à utiliser (nouveau d'abord, puis fallback à l'ancien)
+    const checkPath = `if [ -d "${siteDirNew}" ]; then echo "new"; else echo "legacy"; fi`;
+    const pathResult = await ssh.execCommand(checkPath);
+    const siteDir = pathResult.stdout.trim() === 'new' ? siteDirNew : siteDirLegacy;
+    
+    console.log(`Using site directory: ${siteDir}`);
 
     // Créer ads.txt (essayer dans public d'abord, sinon à la racine)
     const adsContent = `google.com, ${adsenseId}, DIRECT, f08c47fec0942fa0`;
@@ -120,11 +130,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body: ConfigureAdsenseRequest = await request.json();
-    console.log('Configure AdSense request:', { siteId: body.siteId, domain: body.domain });
+    console.log('Configure AdSense request:', { userId: body.userId, siteId: body.siteId, domain: body.domain });
 
-    if (!body.domain || !body.adsenseId) {
+    if (!body.userId || !body.domain || !body.adsenseId) {
       return NextResponse.json(
-        { error: 'Domain et adsenseId sont requis' },
+        { error: 'UserId, domain et adsenseId sont requis' },
         { status: 400 }
       );
     }
@@ -169,7 +179,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Configurer AdSense via SSH
-    const output = await configureAdsenseViaSsh(body.domain, cleanAdsenseId);
+    const output = await configureAdsenseViaSsh(body.domain, body.userId, cleanAdsenseId);
 
     return NextResponse.json({
       success: true,

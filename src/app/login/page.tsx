@@ -16,35 +16,84 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Label } from "@/components/ui/label";
 import { Github, LayoutDashboard } from "lucide-react";
 
+async function initializeUserOnSignup(userId: string, token: string) {
+  try {
+    const response = await fetch("/api/init-user-space", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      console.warn("Avertissement: Espace utilisateur non initialisé", await response.json());
+      // Ne pas bloquer le flux d'inscription si l'init échoue
+    } else {
+      console.log("✅ Espace utilisateur créé avec succès");
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'initialisation:", error);
+    // Ne pas bloquer le flux d'inscription
+  }
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
+    
     try {
       if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        // Créer l'utilisateur Firebase
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        const token = await user.getIdToken();
+
+        // Initialiser l'espace utilisateur sur le VPS en parallèle
+        // (non-bloquant pour que l'utilisateur ne soit pas retardé)
+        initializeUserOnSignup(user.uid, token).catch(console.error);
+
+        // Rediriger vers la sélection de plan (au lieu du dashboard)
+        router.push("/select-plan");
       } else {
         await signInWithEmailAndPassword(auth, email, password);
+        router.push("/dashboard");
       }
-      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      setIsLoading(true);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Si c'est un nouvel utilisateur, initialiser son espace
+      if (result._tokenResponse?.isNewUser) {
+        const token = await user.getIdToken();
+        initializeUserOnSignup(user.uid, token).catch(console.error);
+      }
+
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -86,8 +135,12 @@ export default function LoginPage() {
               />
             </div>
             {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-            <Button className="w-full font-semibold" type="submit">
-              {isRegistering ? "Sign Up" : "Sign In"}
+            <Button 
+              className="w-full font-semibold" 
+              type="submit"
+              disabled={isLoading}
+            >
+              {isLoading ? "Chargement..." : (isRegistering ? "Sign Up" : "Sign In")}
             </Button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -97,7 +150,13 @@ export default function LoginPage() {
                 <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
-            <Button variant="outline" type="button" className="w-full" onClick={signInWithGoogle}>
+            <Button 
+              variant="outline" 
+              type="button" 
+              className="w-full" 
+              onClick={signInWithGoogle}
+              disabled={isLoading}
+            >
               <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
                 <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
               </svg>

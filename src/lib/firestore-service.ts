@@ -152,8 +152,9 @@ export async function seedMockData(uid: string, email: string, name: string) {
     const profileData = {
       name,
       email,
-      plan: 'Professional' as const,
-      storageLimit: 15
+      plan: null,               // ❌ Aucun plan assigné
+      storageLimit: 0,          // ❌ 0 = doit choisir un plan (force redirection vers /select-plan)
+      subscriptionStatus: null
     };
 
     await setDoc(userRef, profileData).catch(async (err) => {
@@ -164,44 +165,7 @@ export async function seedMockData(uid: string, email: string, name: string) {
       }));
     });
 
-    const sitesRef = collection(db, "users", uid, "sites");
-    const sites = [
-      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')), storageUsed: 2.1, framework: 'Next.js', region: 'us-east-1', repositoryUrl: 'https://github.com/user/portfolio' },
-      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5, framework: 'React', region: 'eu-west-3', repositoryUrl: 'https://github.com/user/blog' },
-      { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6, framework: 'Vite', region: 'us-west-2', repositoryUrl: 'https://github.com/user/wiki' }
-    ];
-    
-    for (const site of sites) {
-      const docRef = await addDoc(sitesRef, site);
-      
-      const logsRef = collection(db, "users", uid, "sites", docRef.id, "logs");
-      const mockLogs = [
-        { timestamp: Timestamp.now(), level: 'info', message: 'Build started...', source: 'Builder' },
-        { timestamp: Timestamp.now(), level: 'info', message: 'Optimizing assets...', source: 'Builder' },
-        { timestamp: Timestamp.now(), level: 'info', message: 'Deployment successful.', source: 'System' },
-        { timestamp: Timestamp.now(), level: 'warning', message: 'Minor latency detected in region.', source: 'Monitor' }
-      ];
-      for (const log of mockLogs) {
-        await addDoc(logsRef, log);
-      }
-    }
-
-    const domainsRef = collection(db, "users", uid, "domains");
-    const domains = [
-      { domain: 'saasflow-demo.com', linkedSite: 'Portfolio Site', expiryDate: Timestamp.fromDate(new Date('2025-01-10')), dnsStatus: 'propagated' },
-      { domain: 'blog-me.com', linkedSite: 'Personal Blog', expiryDate: Timestamp.fromDate(new Date('2024-12-15')), dnsStatus: 'pending' }
-    ];
-    for (const domain of domains) {
-      addDoc(domainsRef, domain).catch(() => {});
-    }
-
-    const invoicesRef = collection(db, "users", uid, "invoices");
-    const invoices = [
-      { date: Timestamp.fromDate(new Date('2024-03-01')), amount: 9.99, status: 'paid', pdfUrl: '#' },
-      { date: Timestamp.fromDate(new Date('2024-02-01')), amount: 9.99, status: 'paid', pdfUrl: '#' }
-    ];
-    for (const invoice of invoices) {
-      addDoc(invoicesRef, invoice).catch(() => {});
-    }
+    // ✅ Profil utilisateur créé vide - pas de données de seed
+    // Les sites et domaines seront ajoutés par l'utilisateur via le dashboard
   }
 }

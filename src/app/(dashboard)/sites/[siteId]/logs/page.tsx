@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, collection, query, orderBy, limit } from "firebase/firestore";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { useFirestore, useDoc } from "@/firebase";
+import { doc } from "firebase/firestore";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Site, Log } from "@/lib/firestore-service";
@@ -29,23 +29,55 @@ export default function SiteLogsPage() {
   const siteId = params.siteId as string;
   const { user } = useAuth();
   const firestore = useFirestore();
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const siteRef = useMemo(() => 
     user ? doc(firestore, "users", user.uid, "sites", siteId) : null, 
     [firestore, user, siteId]
   );
 
-  const logsQuery = useMemo(() => 
-    user ? query(
-      collection(firestore, "users", user.uid, "sites", siteId, "logs"), 
-      orderBy("timestamp", "desc"),
-      limit(100)
-    ) : null, 
-    [firestore, user, siteId]
-  );
-
   const { data: site, loading: siteLoading } = useDoc<Site>(siteRef);
-  const { data: logs, loading: logsLoading } = useCollection<Log>(logsQuery);
+
+  // Récupérer les logs réels du VPS
+  const fetchLogs = async () => {
+    if (!user || !site) return;
+
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/get-site-logs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          siteName: site.name,
+          lines: 100,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLogs(data.logs || []);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des logs:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, [site, user]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchLogs();
+  };
 
   const getLogIcon = (level: string) => {
     switch (level) {
@@ -63,7 +95,7 @@ export default function SiteLogsPage() {
     }
   };
 
-  if (siteLoading) {
+  if (siteLoading || loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -89,8 +121,8 @@ export default function SiteLogsPage() {
             <h1 className="text-2xl font-bold tracking-tight">Console Temps Réel</h1>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="border-white/5 h-9">
-          <RefreshCw className="mr-2 h-4 w-4" /> Rafraîchir
+        <Button variant="outline" size="sm" className="border-white/5 h-9" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} /> Rafraîchir
         </Button>
       </div>
 
@@ -108,9 +140,9 @@ export default function SiteLogsPage() {
         <CardContent className="p-0">
           <ScrollArea className="h-[600px] w-full bg-black/40">
             <div className="p-4 space-y-1">
-              {logsLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center py-20 text-muted-foreground text-xs italic">
-                  Initialisation du flux de données...
+                  Chargement des logs en temps réel...
                 </div>
               ) : logs.length === 0 ? (
                 <div className="flex items-center justify-center py-20 text-muted-foreground text-xs italic">
@@ -120,7 +152,7 @@ export default function SiteLogsPage() {
                 logs.map((log) => (
                   <div key={log.id} className="group flex items-start gap-4 py-1 hover:bg-white/5 px-2 rounded transition-colors text-[13px] leading-relaxed">
                     <span className="text-zinc-600 shrink-0 min-w-[140px]">
-                      [{log.timestamp ? format(log.timestamp.toDate(), "HH:mm:ss.SSS") : "..."}]
+                      [{log.timestamp ? format(typeof log.timestamp === 'object' && log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp), "HH:mm:ss.SSS") : "..."}]
                     </span>
                     <span className={cn("font-bold uppercase shrink-0 min-w-[60px]", getLogLevelClass(log.level))}>
                       {log.level}

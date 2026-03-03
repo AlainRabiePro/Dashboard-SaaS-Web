@@ -39,10 +39,31 @@ export default function SitesPage() {
     if (!newSiteName || !newSiteUrl || !user || !canAddSite) return;
     setIsAdding(true);
     try {
+      // D'abord déployer sur le VPS
+      const token = await user.getIdToken();
+      const deployResponse = await fetch("/api/deploy-site", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          siteName: newSiteName,
+        }),
+      });
+
+      if (!deployResponse.ok) {
+        const error = await deployResponse.json();
+        throw new Error(error.message || "Erreur lors du déploiement");
+      }
+
+      // Ensuite ajouter dans Firestore
       await addSite(user.uid, newSiteName, newSiteUrl);
       setNewSiteName("");
       setNewSiteUrl("");
       setIsOpen(false);
+    } catch (error) {
+      console.error("Erreur lors de l'ajout du site:", error);
     } finally {
       setIsAdding(false);
     }

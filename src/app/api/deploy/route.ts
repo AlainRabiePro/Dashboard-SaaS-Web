@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Types
 interface DeployRequest {
+  userId: string;
   domain: string;
   repoUrl: string;
   adsenseId?: string;
@@ -16,7 +17,7 @@ async function verifyAuth(token: string): Promise<boolean> {
 }
 
 // Fonction pour exécuter le déploiement via SSH
-async function deployViaSsh(domain: string, repoUrl: string, adsenseId?: string): Promise<string> {
+async function deployViaSsh(domain: string, repoUrl: string, userId: string, adsenseId?: string): Promise<string> {
   const NodeSSH = require('node-ssh').NodeSSH;
   
   const ssh = new NodeSSH();
@@ -84,6 +85,20 @@ async function deployViaSsh(domain: string, repoUrl: string, adsenseId?: string)
       throw new Error(`Erreur de déploiement: ${result.stderr || result.stdout}`);
     }
 
+    // Après le déploiement réussi, créer le lien symbolique pour organiser par utilisateur
+    const domainSafe = domain.toLowerCase().replace(/\./g, '-');
+    const sourceDir = `/var/www/${domainSafe}`;
+    const targetDir = `/var/www/users/${userId}/sites/${domainSafe}`;
+    const linkCommand = `mkdir -p /var/www/users/${userId}/sites && ln -sfn ${sourceDir} ${targetDir}`;
+
+    const linkResult = await ssh.execCommand(linkCommand);
+    if (linkResult.code !== 0) {
+      console.warn(`[Avertissement] Lien symbolique non créé: ${linkResult.stderr}`);
+      // Ne pas bloquer le déploiement si le lien échoue
+    } else {
+      console.log(`✅ Lien symbolique créé: ${targetDir} -> ${sourceDir}`);
+    }
+
     return result.stdout;
   } finally {
     ssh.dispose();
@@ -112,12 +127,20 @@ export async function POST(request: NextRequest) {
 
     // Parser le body
     const body: DeployRequest = await request.json();
-    console.log('Deploy request:', { domain: body.domain, repoUrl: body.repoUrl });
+    console.log('Deploy request:', { userId: body.userId, domain: body.domain, repoUrl: body.repoUrl });
 
     // Valider les entrées
-    if (!body.domain || !body.repoUrl) {
+    if (!body.userId || !body.domain || !body.repoUrl) {
       return NextResponse.json(
-        { error: 'Domain et repoUrl sont requis', received: body },
+        { error: 'UserId, domain et repoUrl sont requis', received: body },
+        { status: 400 }
+      );
+    }
+
+    // Valider le format de l'userId (alphanumèrique et traits d'union)
+    if (!/^[a-zA-Z0-9_-]+$/.test(body.userId)) {
+      return NextResponse.json(
+        { error: `Format d'userId invalide: "${body.userId}"` },
         { status: 400 }
       );
     }
@@ -141,7 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Exécuter le déploiement
-    const output = await deployViaSsh(body.domain, body.repoUrl, body.adsenseId);
+    const output = await deployViaSsh(body.domain, body.repoUrl, body.userId, body.adsenseId);
 
     return NextResponse.json({
       success: true,

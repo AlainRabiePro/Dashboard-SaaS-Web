@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, collection, query, orderBy, limit } from "firebase/firestore";
+import { doc, collection, query, orderBy, limit, updateDoc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import Link from "next/link";
 export default function DashboardPage() {
   const { user } = useAuth();
   const firestore = useFirestore();
+  const [isCalculatingStorage, setIsCalculatingStorage] = useState(false);
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const sitesRef = useMemo(() => user ? collection(firestore, "users", user.uid, "sites") : null, [firestore, user]);
@@ -34,6 +35,63 @@ export default function DashboardPage() {
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(profileRef);
   const { data: sites, loading: sitesLoading } = useCollection<Site>(sitesRef);
   const { data: invoices, loading: invoicesLoading } = useCollection<Invoice>(latestInvoiceQuery);
+
+  // Récupérer le stockage réel de l'API et mettre à jour Firestore
+  useEffect(() => {
+    if (!user || !firestore || sites.length === 0 || !profile) return;
+
+    const fetchRealStorage = async () => {
+      try {
+        setIsCalculatingStorage(true);
+        const token = await user.getIdToken();
+
+        // Préparer les données à envoyer
+        const siteNames = sites.map(s => s.name);
+
+        const response = await fetch("/api/calculate-storage", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            siteNames: siteNames,
+            plan: profile.plan || 'basic',  // Envoyer le plan pour validation serveur
+          }),
+        });
+
+        if (!response.ok) {
+          console.warn("Erreur lors du calcul du stockage");
+          setIsCalculatingStorage(false);
+          return;
+        }
+
+        const data = await response.json();
+        const storageData = data.storage || {};
+
+        // Mettre à jour Firestore pour chaque site
+        for (const site of sites) {
+          const domainKey = site.name.toLowerCase().replace(/\./g, "-");
+          const realStorageGB = storageData[domainKey] || 0;
+
+          if (realStorageGB !== site.storageUsed) {
+            const siteRef = doc(firestore, "users", user.uid, "sites", site.id);
+            await updateDoc(siteRef, {
+              storageUsed: realStorageGB,
+              lastStorageCheck: new Date(),
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de la récupération du stockage:", error);
+      } finally {
+        setIsCalculatingStorage(false);
+      }
+    };
+
+    fetchRealStorage();
+  }, [user, firestore, sites, profile]);
 
   const activeSitesCount = sites.filter(s => s.status === 'active').length;
   const storageLimit = profile?.storageLimit || 0;
@@ -85,12 +143,15 @@ export default function DashboardPage() {
         </Card>
         <Card className="bg-zinc-950/50 border-white/5 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stockage Utilisé</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              Limite de Stockage
+              {isCalculatingStorage && <Activity className="h-3 w-3 text-primary animate-pulse" />}
+            </CardTitle>
             <HardDrive className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUsed.toFixed(1)} GB</div>
-            <Progress value={totalPercentage} className="h-1.5 mt-2 bg-zinc-800" />
+            <div className="text-2xl font-bold">{storageLimit} GB</div>
+            <p className="text-xs text-muted-foreground mt-2">{totalUsed.toFixed(1)} GB utilisés</p>
           </CardContent>
         </Card>
         <Card className="bg-zinc-950/50 border-white/5 backdrop-blur-sm">

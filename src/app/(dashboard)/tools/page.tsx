@@ -192,6 +192,7 @@ export default function ToolsPage() {
           'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
+          userId: user.uid,
           domain: deployForm.domain,
           repoUrl: deployForm.repoUrl,
         }),
@@ -251,6 +252,7 @@ export default function ToolsPage() {
           'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({
+          userId: user.uid,
           siteId: selectedAdsSiteId,
           domain: selectedSite.name,
           adsenseId: adsenseId,

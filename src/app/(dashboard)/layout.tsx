@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
+import { DashboardProtection } from "@/components/DashboardProtection";
 import { Activity } from "lucide-react";
 
 export default function DashboardLayout({
@@ -30,13 +31,15 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      <DashboardSidebar />
-      <main className="flex-1 overflow-auto dashboard-grid-bg">
-        <div className="max-w-[1200px] mx-auto px-4 py-8 md:px-8">
-          {children}
-        </div>
-      </main>
-    </div>
+    <DashboardProtection>
+      <div className="flex min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+        <DashboardSidebar />
+        <main className="flex-1 overflow-auto dashboard-grid-bg">
+          <div className="max-w-[1200px] mx-auto px-4 py-8 md:px-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </DashboardProtection>
   );
 }

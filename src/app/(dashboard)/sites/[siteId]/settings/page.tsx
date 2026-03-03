@@ -80,15 +80,52 @@ export default function SiteSettingsPage() {
   }
 
   async function handleDelete() {
-    if (!user) return;
+    if (!user || !site) return;
     setIsDeleting(true);
     try {
-      await deleteSite(user.uid, siteId);
+      // Appeler l'API pour supprimer du VPS et Firestore
+      const token = await user.getIdToken();
+      const response = await fetch("/api/delete-site", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          siteName: site.name,
+          siteId: siteId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Erreur lors de la suppression");
+      }
+
+      const data = await response.json();
+      console.log("✅ Réponse suppression:", data);
+
       toast({
         title: "Projet supprimé",
-        description: "Le site a été retiré de votre compte.",
+        description: "Le site a été retiré de votre compte et du VPS.",
       });
+      
+      // Attendre un peu et rediriger
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Forcer le rafraîchissement des données
+      router.refresh();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Rediriger
       router.push("/sites");
+    } catch (error: any) {
+      console.error("❌ Erreur suppression:", error);
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setIsDeleting(false);
     }
