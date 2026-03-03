@@ -3,9 +3,27 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, Loader2 } from "lucide-react";
+import { Users, Plus, Trash2, Loader2, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TeamMember {
   id: string;
@@ -18,25 +36,57 @@ export default function CollaboratorsPage() {
   const { user } = useAuth();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOpenDialog, setIsOpenDialog] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', role: 'editor' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchMembers = async () => {
+    if (!user?.uid) return;
+    try {
+      const response = await fetch('/api/team', {
+        headers: { 'x-user-id': user.uid }
+      });
+      const data = await response.json();
+      setMembers(data.members || []);
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTeamMembers = async () => {
-      if (!user?.uid) return;
-      try {
-        const response = await fetch('/api/team', {
-          headers: { 'x-user-id': user.uid }
-        });
-        const data = await response.json();
-        setMembers(data.members || []);
-      } catch (error) {
-        console.error('Error fetching team members:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTeamMembers();
+    if (user?.uid) {
+      fetchMembers();
+    }
   }, [user?.uid]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid) return;
+    
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/team', {
+        method: 'POST',
+        headers: { 
+          'x-user-id': user.uid,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      if (response.ok) {
+        setFormData({ name: '', email: '', role: 'editor' });
+        setIsOpenDialog(false);
+        await fetchMembers();
+      }
+    } catch (error) {
+      console.error('Error inviting member:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
@@ -73,7 +123,64 @@ export default function CollaboratorsPage() {
                 <Users className="h-5 w-5 text-blue-500" />
                 <CardTitle>Membres actifs</CardTitle>
               </div>
-              <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Inviter</Button>
+              <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Inviter</Button>
+                </DialogTrigger>
+                <DialogContent className="bg-zinc-950 border-white/5">
+                  <DialogHeader>
+                    <DialogTitle>Inviter un collaborateur</DialogTitle>
+                    <DialogDescription>Ajoutez un nouveau membre à votre équipe</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nom</Label>
+                      <Input
+                        id="name"
+                        placeholder="Jean Dupont"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                        className="bg-white/5 border-white/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" /> Email
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="jean@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                        className="bg-white/5 border-white/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Rôle</Label>
+                      <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                        <SelectTrigger className="bg-white/5 border-white/10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/5">
+                          <SelectItem value="editor">Éditeur</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="viewer">Lecteur</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsOpenDialog(false)}>Annuler</Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Inviter
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
             <CardDescription>Votre équipe SaasFlow</CardDescription>
           </CardHeader>

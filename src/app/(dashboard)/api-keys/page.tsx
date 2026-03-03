@@ -3,9 +3,21 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Key, Plus, Copy, Trash2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Key, Plus, Copy, Trash2, Eye, EyeOff, Loader2, Check, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ApiKey {
   id: string;
@@ -20,25 +32,66 @@ export default function ApiKeysPage() {
   const [showKey, setShowKey] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOpenDialog, setIsOpenDialog] = useState(false);
+  const [keyName, setKeyName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newKey, setNewKey] = useState<{ id: string; key: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const fetchApiKeys = async () => {
+    if (!user?.uid) return;
+    try {
+      const response = await fetch('/api/api-keys', {
+        headers: { 'x-user-id': user.uid }
+      });
+      const data = await response.json();
+      setApiKeys(data.keys || []);
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchApiKeys = async () => {
-      if (!user?.uid) return;
-      try {
-        const response = await fetch('/api/api-keys', {
-          headers: { 'x-user-id': user.uid }
-        });
-        const data = await response.json();
-        setApiKeys(data.keys || []);
-      } catch (error) {
-        console.error('Error fetching API keys:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchApiKeys();
+    if (user?.uid) {
+      fetchApiKeys();
+    }
   }, [user?.uid]);
+
+  const handleCreateKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid || !keyName.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/api-keys', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: keyName }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNewKey({ id: data.id, key: data.key });
+        setKeyName('');
+        await fetchApiKeys();
+      }
+    } catch (error) {
+      console.error('Error creating API key:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -68,7 +121,87 @@ export default function ApiKeysPage() {
                 <Key className="h-5 w-5 text-purple-500" />
                 <CardTitle>Clés actives</CardTitle>
               </div>
-              <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Nouvelle clé</Button>
+              <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Nouvelle clé</Button>
+                </DialogTrigger>
+                <DialogContent className="bg-zinc-950 border-white/5">
+                  {newKey ? (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Clé créée avec succès</DialogTitle>
+                        <DialogDescription>Copiez votre clé maintenant. Vous ne pourrez pas la voir à nouveau.</DialogDescription>
+                      </DialogHeader>
+                      <Alert className="bg-amber-500/10 border-amber-500/20">
+                        <AlertCircle className="h-4 w-4 text-amber-400" />
+                        <AlertDescription className="text-amber-400 ml-2">
+                          Gardez cette clé en sécurité. Ne la partagez jamais.
+                        </AlertDescription>
+                      </Alert>
+                      <div className="space-y-3">
+                        <div className="bg-zinc-900 rounded p-3 font-mono text-sm break-all border border-white/10">
+                          {newKey.key}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            className="flex-1"
+                            onClick={() => copyToClipboard(newKey.key)}
+                          >
+                            {copied ? (
+                              <>
+                                <Check className="h-4 w-4 mr-2" />
+                                Copié!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copier
+                              </>
+                            )}
+                          </Button>
+                          <Button 
+                            className="flex-1"
+                            onClick={() => {
+                              setNewKey(null);
+                              setIsOpenDialog(false);
+                            }}
+                          >
+                            Fermer
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Créer une nouvelle clé API</DialogTitle>
+                        <DialogDescription>Donnez un nom à votre nouvelle clé API.</DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateKey} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="keyName">Nom de la clé</Label>
+                          <Input
+                            id="keyName"
+                            placeholder="Ma clé API"
+                            value={keyName}
+                            onChange={(e) => setKeyName(e.target.value)}
+                            required
+                            className="bg-white/5 border-white/10"
+                          />
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsOpenDialog(false)}>Annuler</Button>
+                          <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Créer
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
             <CardDescription>Gérez l'accès à votre API</CardDescription>
           </CardHeader>
@@ -98,7 +231,7 @@ export default function ApiKeysPage() {
                     <Button size="sm" variant="ghost" onClick={() => setShowKey(!showKey)}>
                       {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
-                    <Button size="sm" variant="ghost"><Copy className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(key.key)}><Copy className="h-4 w-4" /></Button>
                     {key.status === 'active' && <Button size="sm" variant="ghost"><Trash2 className="h-4 w-4 text-red-500" /></Button>}
                   </div>
                 </div>

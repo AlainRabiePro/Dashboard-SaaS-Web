@@ -1,108 +1,134 @@
-
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useFirestore, useCollection, useDoc } from "@/firebase";
-import { collection, query, doc, addDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Domain, UserProfile, Site } from "@/lib/firestore-service";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { CheckCircle2, Clock, XCircle, Search, RefreshCw, Loader2, Plus, Trash2, Copy } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Search, Loader2, Plus, Trash2 } from "lucide-react";
+
+interface Domain {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  ssl: boolean;
+  pointsTo: string | null;
+}
 
 export default function DomainsPage() {
   const { user } = useAuth();
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isOpenDialog, setIsOpenDialog] = useState(false);
   const [newDomain, setNewDomain] = useState("");
-  const [selectedSite, setSelectedSite] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Récupérer le profil et les sites de l'utilisateur
-  const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
-  const sitesRef = useMemo(() => user ? collection(firestore, "users", user.uid, "sites") : null, [firestore, user]);
-  const domainsRef = useMemo(() => user ? collection(firestore, "users", user.uid, "domains") : null, [firestore, user]);
-
-  const { data: profile } = useDoc<UserProfile>(profileRef);
-  const { data: sites } = useCollection<Site>(sitesRef);
-  const { data: domains, loading } = useCollection<Domain>(domainsRef);
-
-  const filteredDomains = domains.filter(d => 
-    d.domain.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleAddDomain = async () => {
-    if (!newDomain || !selectedSite || !user) return;
-
-    setIsAdding(true);
+  const fetchDomains = async () => {
+    if (!user?.uid) return;
+    setLoading(true);
     try {
-      const domainsCollection = collection(firestore, "users", user.uid, "domains");
-      
-      await addDoc(domainsCollection, {
-        domain: newDomain,
-        linkedSite: selectedSite,
-        dnsStatus: 'propagated' as const,
-        expiryDate: Timestamp.fromDate(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)), // 1 an
-        createdAt: Timestamp.now(),
+      const response = await fetch('/api/domains', {
+        headers: { 'x-user-id': user.uid }
       });
-
-      toast({
-        title: "Domaine ajouté",
-        description: `${newDomain} a été lié au site.`,
-      });
-
-      setNewDomain("");
-      setSelectedSite("");
-      setIsOpen(false);
-    } catch (error: any) {
+      const data = await response.json();
+      setDomains(data.domains || []);
+    } catch (error) {
+      console.error('Error fetching domains:', error);
       toast({
         title: "Erreur",
-        description: error.message,
+        description: "Impossible de récupérer les domaines",
         variant: "destructive",
       });
     } finally {
-      setIsAdding(false);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchDomains();
+    }
+  }, [user?.uid]);
+
+  const handleAddDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.uid || !newDomain.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/domains', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newDomain }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Domaine ajouté",
+          description: `${newDomain} a été ajouté à vos domaines.`,
+        });
+        setNewDomain("");
+        setIsOpenDialog(false);
+        await fetchDomains();
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Erreur",
+          description: error.error || "Impossible d'ajouter le domaine",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Une erreur s'est produite",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteDomain = async (domainId: string) => {
-    if (!user) return;
-
-    try {
-      const domainRef = doc(firestore, "users", user.uid, "domains", domainId);
-      await deleteDoc(domainRef);
-
-      toast({
-        title: "Domaine supprimé",
-        description: "Le domaine a été retiré.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    if (!user?.uid) return;
+    // TODO: Implement delete endpoint
+    toast({
+      title: "À venir",
+      description: "La suppression de domaine sera disponible bientôt",
+    });
   };
 
+  const filteredDomains = domains.filter(d => 
+    d.name.toLowerCase().includes(search.toLowerCase())
+  );
+
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'propagated':
-        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"><CheckCircle2 className="mr-1 h-3 w-3" /> Propagé</Badge>;
+    switch (status.toLowerCase()) {
+      case 'verified':
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"><CheckCircle2 className="mr-1 h-3 w-3" /> Vérifié</Badge>;
       case 'pending':
-        return <Badge variant="outline" className="text-amber-500 border-amber-500/20 bg-amber-500/10"><Clock className="mr-1 h-3 w-3" /> En attente</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20"><Clock className="mr-1 h-3 w-3" /> En attente</Badge>;
       case 'expired':
-        return <Badge variant="destructive" className="bg-rose-500/10 text-rose-500 border-rose-500/20"><XCircle className="mr-1 h-3 w-3" /> Expiré</Badge>;
+        return <Badge className="bg-red-500/10 text-red-500 border-red-500/20"><XCircle className="mr-1 h-3 w-3" /> Expiré</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -110,71 +136,55 @@ export default function DomainsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold">Domaines</h1>
           <p className="text-sm text-muted-foreground">Gérez vos domaines personnalisés</p>
         </div>
 
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>
           <DialogTrigger asChild>
             <Button size="lg" className="gap-2">
               <Plus className="h-4 w-4" />
               Ajouter un domaine
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="bg-zinc-950 border-white/5">
             <DialogHeader>
               <DialogTitle>Ajouter un domaine</DialogTitle>
               <DialogDescription>
-                Liez un domaine personnalisé à l'un de vos sites
+                Ajoutez un nouveau domaine à votre compte
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4">
-              <div className="grid gap-2">
+            <form onSubmit={handleAddDomain} className="space-y-4">
+              <div className="space-y-2">
                 <Label htmlFor="domain">Nom du domaine</Label>
                 <Input
                   id="domain"
                   placeholder="exemple.com"
                   value={newDomain}
                   onChange={(e) => setNewDomain(e.target.value)}
-                  disabled={isAdding}
+                  required
+                  disabled={isSubmitting}
+                  className="bg-white/5 border-white/10"
                 />
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="site">Site lié</Label>
-                <Select value={selectedSite} onValueChange={setSelectedSite} disabled={isAdding}>
-                  <SelectTrigger id="site">
-                    <SelectValue placeholder="Sélectionner un site" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sites.map((site) => (
-                      <SelectItem key={site.id} value={site.id}>
-                        {site.name || site.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isAdding}>
-                Annuler
-              </Button>
-              <Button onClick={handleAddDomain} disabled={!newDomain || !selectedSite || isAdding}>
-                {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Ajouter
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsOpenDialog(false)} disabled={isSubmitting}>
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={!newDomain.trim() || isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Ajouter
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -185,16 +195,15 @@ export default function DomainsPage() {
         />
       </div>
 
-      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Domaine</TableHead>
-                <TableHead>Site lié</TableHead>
-                <TableHead>Status DNS</TableHead>
-                <TableHead>Expiration</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead>SSL</TableHead>
+                <TableHead>Points vers</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -215,30 +224,29 @@ export default function DomainsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredDomains.map((domain) => {
-                  const linkedSite = sites.find((s) => s.id === domain.linkedSite);
-                  const expiryDate = domain.expiryDate?.toDate?.() || new Date();
-
-                  return (
-                    <TableRow key={domain.id}>
-                      <TableCell className="font-mono text-sm font-medium">{domain.domain}</TableCell>
-                      <TableCell>{linkedSite?.name || domain.linkedSite}</TableCell>
-                      <TableCell>{getStatusBadge(domain.dnsStatus || "pending")}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(expiryDate, "dd MMM yyyy")}
-                      </TableCell>
-                      <TableCell className="space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteDomain(domain.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                filteredDomains.map((domain) => (
+                  <TableRow key={domain.id}>
+                    <TableCell className="font-mono text-sm font-medium">{domain.name}</TableCell>
+                    <TableCell>{getStatusBadge(domain.status)}</TableCell>
+                    <TableCell>
+                      <Badge className={domain.ssl ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}>
+                        {domain.ssl ? 'Activé' : 'Désactivé'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {domain.pointsTo || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteDomain(domain.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
