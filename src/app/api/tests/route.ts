@@ -21,101 +21,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Générer des résultats de tests réalistes
-    const testResults = [
-      {
-        id: 'test-1',
-        name: 'Unit: Authentication',
-        status: 'passed',
-        duration: 234,
-        timestamp: new Date(Date.now() - 1 * 3600000).toISOString(),
-      },
-      {
-        id: 'test-2',
-        name: 'Unit: API Endpoints',
-        status: 'passed',
-        duration: 567,
-        timestamp: new Date(Date.now() - 1.5 * 3600000).toISOString(),
-      },
-      {
-        id: 'test-3',
-        name: 'Integration: Database',
-        status: 'passed',
-        duration: 890,
-        timestamp: new Date(Date.now() - 2 * 3600000).toISOString(),
-      },
-      {
-        id: 'test-4',
-        name: 'E2E: User Flow',
-        status: 'failed',
-        duration: 1230,
-        timestamp: new Date(Date.now() - 2.5 * 3600000).toISOString(),
-        error: 'Timeout waiting for element .submit-button',
-      },
-      {
-        id: 'test-5',
-        name: 'Performance: Load Time',
-        status: 'passed',
-        duration: 345,
-        timestamp: new Date(Date.now() - 3 * 3600000).toISOString(),
-      },
-      {
-        id: 'test-6',
-        name: 'Security: XSS Prevention',
-        status: 'passed',
-        duration: 456,
-        timestamp: new Date(Date.now() - 4 * 3600000).toISOString(),
-      },
-      {
-        id: 'test-7',
-        name: 'Integration: Email Service',
-        status: 'passed',
-        duration: 678,
-        timestamp: new Date(Date.now() - 24 * 3600000).toISOString(),
-      },
-      {
-        id: 'test-8',
-        name: 'Unit: Form Validation',
-        status: 'passed',
-        duration: 234,
-        timestamp: new Date(Date.now() - 24 * 3600000).toISOString(),
-      },
-    ];
+    // Récupérer les vrais résultats de tests depuis Firestore
+    const testsRef = collection(db, 'users', userId, 'tests');
+    const testsSnap = await getDocs(query(testsRef, orderBy('timestamp', 'desc')));
+    
+    const testResults = testsSnap.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name,
+      status: doc.data().status,
+      duration: doc.data().duration || 0,
+      timestamp: doc.data().timestamp,
+      error: doc.data().error,
+    }));
 
     const passedCount = testResults.filter(t => t.status === 'passed').length;
     const failedCount = testResults.filter(t => t.status === 'failed').length;
     const totalDuration = testResults.reduce((sum, t) => sum + t.duration, 0);
 
-    // Timeline (commits/deployments avec tests)
-    const timeline = [
-      {
-        id: 'commit-1',
-        message: 'Fix authentication bug',
-        author: 'dev@example.com',
-        timestamp: new Date(Date.now() - 1 * 3600000).toISOString(),
-        tests: 8,
-        passed: 8,
-        failed: 0,
-      },
-      {
-        id: 'commit-2',
-        message: 'Add new API endpoint',
-        author: 'dev@example.com',
-        timestamp: new Date(Date.now() - 2.5 * 3600000).toISOString(),
-        tests: 8,
-        passed: 7,
-        failed: 1,
-      },
-      {
-        id: 'commit-3',
-        message: 'Update database schema',
-        author: 'dev@example.com',
-        timestamp: new Date(Date.now() - 24 * 3600000).toISOString(),
-        tests: 8,
-        passed: 8,
-        failed: 0,
-      },
-    ];
+    // Timeline depuis Firestore
+    const timelineRef = collection(db, 'users', userId, 'tests', 'timeline', 'commits');
+    const timelineSnap = await getDocs(query(timelineRef, orderBy('timestamp', 'desc')));
+    const timeline = timelineSnap.docs.map(doc => ({
+      id: doc.id,
+      message: doc.data().message,
+      author: doc.data().author,
+      timestamp: doc.data().timestamp,
+      tests: doc.data().tests || 0,
+      passed: doc.data().passed || 0,
+      failed: doc.data().failed || 0,
+    }));
 
     return NextResponse.json({
       results: testResults,
@@ -123,9 +57,9 @@ export async function GET(request: NextRequest) {
         total: testResults.length,
         passed: passedCount,
         failed: failedCount,
-        successRate: ((passedCount / testResults.length) * 100).toFixed(1),
+        successRate: testResults.length > 0 ? ((passedCount / testResults.length) * 100).toFixed(1) : '0',
         totalDuration,
-        avgDuration: Math.floor(totalDuration / testResults.length),
+        avgDuration: testResults.length > 0 ? Math.floor(totalDuration / testResults.length) : 0,
       },
       timeline,
     });

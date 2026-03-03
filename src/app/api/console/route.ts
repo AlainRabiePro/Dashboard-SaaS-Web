@@ -25,36 +25,27 @@ export async function GET(request: NextRequest) {
     const level = request.nextUrl.searchParams.get('level') || 'all';
     const limit_param = parseInt(request.nextUrl.searchParams.get('limit') || '100');
 
-    // Générer des logs réalistes
-    const logs = [];
-    const logLevels = ['info', 'warn', 'error', 'debug'];
-    const messages = [
-      'Application started successfully',
-      'Database connection established',
-      'Cache initialized',
-      'API server listening on port 3000',
-      'Failed to fetch user data',
-      'Request timeout after 30s',
-      'Invalid API key provided',
-      'SSL certificate expired',
-      'Memory usage at 85%',
-      'Backup completed successfully',
-      'Rate limit exceeded',
-      'Service degradation detected',
-    ];
+    // Récupérer les vrais logs de Firestore
+    let logsRef;
+    if (siteId) {
+      logsRef = collection(db, 'users', userId, 'sites', siteId, 'logs');
+    } else {
+      logsRef = collection(db, 'users', userId, 'logs');
+    }
 
-    const now = Date.now();
-    for (let i = 0; i < 50; i++) {
-      const logLevel = logLevels[Math.floor(Math.random() * logLevels.length)];
-      
-      if (level !== 'all' && level !== logLevel) continue;
-      
-      logs.push({
-        timestamp: new Date(now - i * 30000).toISOString(),
-        level: logLevel,
-        message: messages[Math.floor(Math.random() * messages.length)],
-        source: ['API', 'Database', 'Worker', 'Frontend'][Math.floor(Math.random() * 4)],
-      });
+    let logsQuery = query(logsRef, orderBy('timestamp', 'desc'));
+    const logsSnap = await getDocs(logsQuery);
+    
+    let logs = logsSnap.docs.map(doc => ({
+      timestamp: doc.data().timestamp,
+      level: doc.data().level,
+      message: doc.data().message,
+      source: doc.data().source,
+    }));
+
+    // Filtrer par niveau si demandé
+    if (level !== 'all') {
+      logs = logs.filter(l => l.level === level);
     }
 
     const errorCount = logs.filter(l => l.level === 'error').length;

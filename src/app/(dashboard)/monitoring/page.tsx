@@ -17,18 +17,28 @@ interface Site {
 
 export default function MonitoringPage() {
   const { user } = useAuth();
+  const [allSites, setAllSites] = useState<Site[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [summary, setSummary] = useState({ uptime: 0, latency: 0, errorRate: 0, alerts: 0 });
   const [loading, setLoading] = useState(true);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('all');
 
   useEffect(() => {
     const fetchMonitoring = async () => {
       if (!user?.uid) return;
       try {
-        const response = await fetch('/api/monitoring', {
+        setLoading(true);
+        const params = selectedSiteId !== 'all' ? `?siteId=${selectedSiteId}` : '';
+        const response = await fetch(`/api/monitoring${params}`, {
           headers: { 'x-user-id': user.uid }
         });
         const data = await response.json();
+        
+        // Si c'est la première charge ou 'all', stocker tous les sites
+        if (selectedSiteId === 'all' || allSites.length === 0) {
+          setAllSites(data.sites || []);
+        }
+        
         setSites(data.sites || []);
         setSummary(data.summary || {});
       } catch (error) {
@@ -39,7 +49,7 @@ export default function MonitoringPage() {
     };
 
     fetchMonitoring();
-  }, [user?.uid]);
+  }, [user?.uid, selectedSiteId]);
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -56,9 +66,28 @@ export default function MonitoringPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Monitoring</h1>
-        <p className="text-muted-foreground italic">Suivez la performance et la santé de vos applications en temps réel.</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Monitoring</h1>
+          <p className="text-muted-foreground italic">Suivez la performance et la santé de vos applications en temps réel.</p>
+        </div>
+
+        {/* Site Selector */}
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium">Sélectionner un site :</label>
+          <select
+            value={selectedSiteId}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
+            className="px-3 py-2 rounded-md bg-zinc-900 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-500"
+          >
+            <option value="all">Tous les sites</option>
+            {allSites.map(site => (
+              <option key={site.id} value={site.id}>
+                {site.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
