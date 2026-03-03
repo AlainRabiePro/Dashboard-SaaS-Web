@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserProfile, Invoice } from "@/lib/firestore-service";
 import { format } from "date-fns";
-import { FileDown, CreditCard, Loader2, Calendar } from "lucide-react";
+import { FileDown, CreditCard, Loader2, Calendar, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 export default function BillingPage() {
   const { user } = useAuth();
@@ -24,6 +25,15 @@ export default function BillingPage() {
 
   const { data: profile } = useDoc<UserProfile>(profileRef);
   const { data: invoices, loading } = useCollection<Invoice>(invoicesQuery);
+
+  const getPlanPrice = (plan: string | undefined) => {
+    switch (plan) {
+      case 'Starter': return '$4.99';
+      case 'Professional': return '$9.99';
+      case 'Enterprise': return '$16.99';
+      default: return '$9.99';
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -121,9 +131,15 @@ export default function BillingPage() {
              </CardHeader>
              <CardContent className="space-y-4">
                <div className="space-y-1">
-                 <p className="text-xl font-bold">{profile?.plan || "Chargement..."}</p>
+                 <p className="text-xl font-bold">{profile?.plan || "Chargement..."} Plan</p>
                  <p className="text-xs text-muted-foreground italic">Prochaine facturation le 01 Avril 2024</p>
                </div>
+               
+               <Button className="w-full font-bold text-xs uppercase tracking-widest" asChild>
+                 <Link href="/storage">
+                   <Sparkles className="mr-2 h-3 w-3" /> Upgrade Maintenant
+                 </Link>
+               </Button>
                
                <div className="pt-4 border-t border-primary/10 space-y-3">
                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -132,11 +148,11 @@ export default function BillingPage() {
                  <div className="space-y-2">
                    <div className="flex justify-between text-xs">
                      <span className="text-muted-foreground">01 Mai 2024</span>
-                     <span className="font-semibold">$9.99</span>
+                     <span className="font-semibold">{getPlanPrice(profile?.plan)}</span>
                    </div>
                    <div className="flex justify-between text-xs">
                      <span className="text-muted-foreground">01 Juin 2024</span>
-                     <span className="font-semibold">$9.99</span>
+                     <span className="font-semibold">{getPlanPrice(profile?.plan)}</span>
                    </div>
                  </div>
                </div>
