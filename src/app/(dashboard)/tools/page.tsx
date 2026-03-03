@@ -20,7 +20,8 @@ import {
   Lock,
   GitBranch,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Code2
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -34,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function ToolsPage() {
   const { user } = useAuth();
@@ -48,6 +50,11 @@ export default function ToolsPage() {
     domain: "",
     repoUrl: ""
   });
+
+  // State for Ads Modal
+  const [isAdsOpen, setIsAdsOpen] = useState(false);
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [adsCode, setAdsCode] = useState("");
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const { data: profile } = useDoc<UserProfile>(profileRef);
@@ -66,7 +73,7 @@ export default function ToolsPage() {
     {
       id: "ads",
       title: "Implémenter des pubs",
-      description: "Configurez vos tags AdSense et gérez vos emplacements publicitaires.",
+      description: "Configurez vos tags AdSense et gérez vos emplacements publicitaires via Ads.tsx.",
       icon: Megaphone,
       color: "text-amber-500",
       bg: "bg-amber-500/10",
@@ -110,6 +117,11 @@ export default function ToolsPage() {
       return;
     }
 
+    if (toolId === 'ads') {
+      setIsAdsOpen(true);
+      return;
+    }
+
     setLoadingStates(prev => ({ ...prev, [toolId]: true }));
     
     setTimeout(() => {
@@ -127,9 +139,7 @@ export default function ToolsPage() {
 
     setDeployLoading(true);
     try {
-      // Simulate deployment and add site
       await addSite(user.uid, deployForm.domain, `https://${deployForm.domain}`, deployForm.repoUrl);
-      
       toast({
         title: "Déploiement lancé",
         description: `Le déploiement de ${deployForm.domain} a été initialisé.`,
@@ -139,6 +149,20 @@ export default function ToolsPage() {
     } finally {
       setDeployLoading(false);
     }
+  };
+
+  const handleAdsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdsLoading(true);
+    // Simulation d'une sauvegarde de configuration
+    setTimeout(() => {
+      toast({
+        title: "Configuration AdSense mise à jour",
+        description: "Votre fichier Ads.tsx a été enregistré et sera déployé prochainement.",
+      });
+      setAdsLoading(false);
+      setIsAdsOpen(false);
+    }, 1200);
   };
 
   const isLocked = (minPlan: string) => {
@@ -283,6 +307,64 @@ export default function ToolsPage() {
                 className="font-bold text-xs px-6"
               >
                 {deployLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Démarrer le déploiement"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ads Modal */}
+      <Dialog open={isAdsOpen} onOpenChange={setIsAdsOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 sm:max-w-[600px]">
+          <form onSubmit={handleAdsSubmit}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-amber-500" />
+                Configuration AdSense (Ads.tsx)
+              </DialogTitle>
+              <DialogDescription>
+                Collez ici le code de votre composant d'annonces pour l'injecter dans votre infrastructure.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-6">
+              <div className="grid gap-2">
+                <Label htmlFor="adsCode" className="flex items-center gap-2">
+                  <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Contenu de Ads.tsx
+                </Label>
+                <Textarea
+                  id="adsCode"
+                  placeholder="import React from 'react';... export const Ads = () => { ... };"
+                  className="bg-zinc-900 border-white/5 font-mono text-xs min-h-[300px]"
+                  value={adsCode}
+                  onChange={(e) => setAdsCode(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <Alert className="bg-amber-500/5 border-amber-500/10 text-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertTitle className="text-xs font-bold uppercase tracking-tight">Vérification</AlertTitle>
+                <AlertDescription className="text-[10px] leading-tight">
+                  Assurez-vous que votre code React est valide et n'inclut pas d'importations externes non supportées.
+                </AlertDescription>
+              </Alert>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                onClick={() => setIsAdsOpen(false)}
+                className="text-xs"
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={adsLoading}
+                className="font-bold text-xs px-6"
+              >
+                {adsLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Sauvegarder Ads.tsx"}
               </Button>
             </DialogFooter>
           </form>
