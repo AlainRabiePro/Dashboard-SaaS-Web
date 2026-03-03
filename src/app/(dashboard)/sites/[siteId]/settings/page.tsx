@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Site, updateSite, deleteSite } from "@/lib/firestore-service";
 import { formatStorage } from "@/lib/format-storage";
 import { useToast } from "@/hooks/use-toast";
@@ -201,38 +200,15 @@ export default function SiteSettingsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Framework</Label>
-                  <Select 
-                    value={formData.framework} 
-                    onValueChange={(v) => setFormData({...formData, framework: v})}
-                  >
-                    <SelectTrigger className="bg-zinc-900 border-white/5 text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10">
-                      <SelectItem value="Next.js">Next.js</SelectItem>
-                      <SelectItem value="React">React</SelectItem>
-                      <SelectItem value="Vue.js">Vue.js</SelectItem>
-                      <SelectItem value="Vite">Vite</SelectItem>
-                      <SelectItem value="Svelte">Svelte</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="px-3 py-2 bg-zinc-900 border border-white/5 rounded-md text-foreground">
+                    Next.js
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Région de déploiement</Label>
-                  <Select 
-                    value={formData.region} 
-                    onValueChange={(v) => setFormData({...formData, region: v})}
-                  >
-                    <SelectTrigger className="bg-zinc-900 border-white/5 text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10">
-                      <SelectItem value="us-east-1">US East (N. Virginia)</SelectItem>
-                      <SelectItem value="eu-west-3">Europe (Paris)</SelectItem>
-                      <SelectItem value="eu-central-1">Europe (Frankfurt)</SelectItem>
-                      <SelectItem value="ap-southeast-1">Asia Pacific (Singapore)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="px-3 py-2 bg-zinc-900 border border-white/5 rounded-md text-foreground">
+                    US East (N. Virginia)
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -36,6 +36,16 @@ export interface Site {
   framework: string;
   region: string;
   repositoryUrl?: string;
+  // Support pour multiples bases de données
+  databases?: {
+    [key: string]: {
+      id: string;
+      name: string;
+      type: 'firestore' | 'supabase' | 'mysql' | 'mariadb' | 'postgresql' | 'mongodb' | 'custom';
+      config: any;
+      isDefault?: boolean;
+    };
+  };
 }
 
 export interface Log {
