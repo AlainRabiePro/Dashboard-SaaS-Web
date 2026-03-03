@@ -83,6 +83,9 @@ export default function StoragePage() {
   const totalLimit = profile?.storageLimit || 0;
   const usagePercentage = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0;
 
+  // Afficher l'alerte si l'utilisation dépasse 80% et qu'un plan supérieur existe
+  const showStorageWarning = usagePercentage >= 80 && profile?.plan !== 'Enterprise';
+
   const chartData = sites.map(site => ({
     name: site.name,
     value: site.storageUsed || 0
@@ -101,7 +104,7 @@ export default function StoragePage() {
       });
       setIsDialogOpen(false);
     } catch (e) {
-      // Les erreurs sont gérées par l'ErrorEmitter global, mais on peut notifier l'utilisateur ici aussi
+      // Les erreurs sont gérées par l'ErrorEmitter global
     } finally {
       setIsUpdating(null);
     }
@@ -136,15 +139,17 @@ export default function StoragePage() {
             </div>
 
             <div className="p-5 rounded-xl bg-zinc-900/50 border border-white/5 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <AlertTriangle className="h-5 w-5 text-primary shrink-0" />
+              {showStorageWarning && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <AlertTriangle className="h-5 w-5 text-primary shrink-0" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Besoin de plus d'espace ?</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Passez à un forfait supérieur pour obtenir jusqu'à 100 Go de stockage haute performance.</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">Besoin de plus d'espace ?</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Passez à un forfait supérieur pour obtenir jusqu'à 100 Go de stockage haute performance.</p>
-                </div>
-              </div>
+              )}
               
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
