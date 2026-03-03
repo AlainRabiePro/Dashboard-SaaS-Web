@@ -35,6 +35,7 @@ export interface Site {
   storageUsed: number;
   framework: string;
   region: string;
+  repositoryUrl?: string;
 }
 
 export interface Log {
@@ -61,11 +62,12 @@ export interface Invoice {
   pdfUrl: string;
 }
 
-export function addSite(uid: string, name: string, url: string) {
+export function addSite(uid: string, name: string, url: string, repositoryUrl?: string) {
   const sitesRef = collection(db, "users", uid, "sites");
   const data = {
     name,
     url,
+    repositoryUrl: repositoryUrl || '',
     status: 'active' as const,
     createdAt: Timestamp.now(),
     storageUsed: 0.1,
@@ -78,7 +80,7 @@ export function addSite(uid: string, name: string, url: string) {
     addDoc(logsRef, {
       timestamp: Timestamp.now(),
       level: 'info',
-      message: 'Project initialized successfully.',
+      message: `Project initialized successfully with repo: ${repositoryUrl || 'N/A'}.`,
       source: 'System'
     });
   }).catch(async (err) => {
@@ -164,9 +166,9 @@ export async function seedMockData(uid: string, email: string, name: string) {
 
     const sitesRef = collection(db, "users", uid, "sites");
     const sites = [
-      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')), storageUsed: 2.1, framework: 'Next.js', region: 'us-east-1' },
-      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5, framework: 'React', region: 'eu-west-3' },
-      { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6, framework: 'Vite', region: 'us-west-2' }
+      { name: 'Portfolio Site', url: 'https://myportfolio.saasflow.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-01-10')), storageUsed: 2.1, framework: 'Next.js', region: 'us-east-1', repositoryUrl: 'https://github.com/user/portfolio' },
+      { name: 'Personal Blog', url: 'https://blog.me.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-02-15')), storageUsed: 1.5, framework: 'React', region: 'eu-west-3', repositoryUrl: 'https://github.com/user/blog' },
+      { name: 'Internal Wiki', url: 'https://wiki.internal.com', status: 'active', createdAt: Timestamp.fromDate(new Date('2024-03-01')), storageUsed: 0.6, framework: 'Vite', region: 'us-west-2', repositoryUrl: 'https://github.com/user/wiki' }
     ];
     
     for (const site of sites) {

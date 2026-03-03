@@ -8,7 +8,7 @@ import { doc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { UserProfile } from "@/lib/firestore-service";
+import { UserProfile, addSite } from "@/lib/firestore-service";
 import { 
   Rocket, 
   Megaphone, 
@@ -17,15 +17,37 @@ import {
   Loader2, 
   ArrowRight,
   ShieldCheck,
-  Lock
+  Lock,
+  GitBranch,
+  Globe,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ToolsPage() {
   const { user } = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  
+  // State for Deployment Modal
+  const [isDeployOpen, setIsDeployOpen] = useState(false);
+  const [deployLoading, setDeployLoading] = useState(false);
+  const [deployForm, setDeployForm] = useState({
+    domain: "",
+    repoUrl: ""
+  });
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const { data: profile } = useDoc<UserProfile>(profileRef);
@@ -83,6 +105,11 @@ export default function ToolsPage() {
       return;
     }
 
+    if (toolId === 'deploy') {
+      setIsDeployOpen(true);
+      return;
+    }
+
     setLoadingStates(prev => ({ ...prev, [toolId]: true }));
     
     setTimeout(() => {
@@ -92,6 +119,26 @@ export default function ToolsPage() {
         description: "L'opération a été lancée avec succès en arrière-plan.",
       });
     }, 1500);
+  };
+
+  const handleDeploySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !deployForm.domain || !deployForm.repoUrl) return;
+
+    setDeployLoading(true);
+    try {
+      // Simulate deployment and add site
+      await addSite(user.uid, deployForm.domain, `https://${deployForm.domain}`, deployForm.repoUrl);
+      
+      toast({
+        title: "Déploiement lancé",
+        description: `Le déploiement de ${deployForm.domain} a été initialisé.`,
+      });
+      setIsDeployOpen(false);
+      setDeployForm({ domain: "", repoUrl: "" });
+    } finally {
+      setDeployLoading(false);
+    }
   };
 
   const isLocked = (minPlan: string) => {
@@ -169,6 +216,78 @@ export default function ToolsPage() {
           );
         })}
       </div>
+
+      {/* Deployment Modal */}
+      <Dialog open={isDeployOpen} onOpenChange={setIsDeployOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 sm:max-w-[425px]">
+          <form onSubmit={handleDeploySubmit}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Rocket className="h-5 w-5 text-blue-500" />
+                Déployer un nouveau site
+              </DialogTitle>
+              <DialogDescription>
+                Configurez les paramètres de déploiement de votre application.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-6">
+              <div className="grid gap-2">
+                <Label htmlFor="domain" className="flex items-center gap-2">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  Nom de domaine
+                </Label>
+                <Input
+                  id="domain"
+                  placeholder="mon-app.com"
+                  className="bg-zinc-900 border-white/5"
+                  value={deployForm.domain}
+                  onChange={(e) => setDeployForm({ ...deployForm, domain: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="repo" className="flex items-center gap-2">
+                  <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
+                  Repo Git
+                </Label>
+                <Input
+                  id="repo"
+                  placeholder="https://github.com/user/repo"
+                  className="bg-zinc-900 border-white/5"
+                  value={deployForm.repoUrl}
+                  onChange={(e) => setDeployForm({ ...deployForm, repoUrl: e.target.value })}
+                  required
+                />
+              </div>
+              
+              <Alert className="bg-blue-500/5 border-blue-500/10 text-blue-200">
+                <AlertCircle className="h-4 w-4 text-blue-500" />
+                <AlertTitle className="text-xs font-bold uppercase tracking-tight">Information</AlertTitle>
+                <AlertDescription className="text-[10px] leading-tight">
+                  Le dépôt Git doit être <strong>public</strong> pendant toute la durée de la phase de déploiement initial.
+                </AlertDescription>
+              </Alert>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                onClick={() => setIsDeployOpen(false)}
+                className="text-xs"
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={deployLoading}
+                className="font-bold text-xs px-6"
+              >
+                {deployLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Démarrer le déploiement"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

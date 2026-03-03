@@ -24,7 +24,8 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "storageUsed": { "type": "number", "description": "Storage consumption in GB" },
         "framework": { "type": "string" },
-        "region": { "type": "string" }
+        "region": { "type": "string" },
+        "repositoryUrl": { "type": "string", "description": "URL of the git repository" }
       },
       "required": ["name", "url", "status", "createdAt", "storageUsed", "framework", "region"]
     },
