@@ -59,7 +59,8 @@ export default function ToolsPage() {
   // State for Ads Modal
   const [isAdsOpen, setIsAdsOpen] = useState(false);
   const [adsLoading, setAdsLoading] = useState(false);
-  const [adsCode, setAdsCode] = useState("");
+  const [selectedAdsSiteId, setSelectedAdsSiteId] = useState<string | null>(null);
+  const [adsenseId, setAdsenseId] = useState("");
 
   // State for Backup Modal
   const [isBackupOpen, setIsBackupOpen] = useState(false);
@@ -227,18 +228,60 @@ export default function ToolsPage() {
 
   const handleAdsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adsCode) return;
+    if (!user || !selectedAdsSiteId || !adsenseId) return;
 
     setAdsLoading(true);
-    // Simulation d'une sauvegarde de configuration
-    setTimeout(() => {
-      setAdsLoading(false);
-      setIsAdsOpen(false);
-      toast({
-        title: "Configuration Ads.tsx enregistrée",
-        description: "Votre composant publicitaire a été injecté avec succès.",
+    try {
+      const selectedSite = sites.find(s => s.id === selectedAdsSiteId);
+      if (!selectedSite) {
+        throw new Error('Site non trouvé');
+      }
+
+      // Récupérer le token d'authentification
+      const idToken = await user.getIdToken();
+      if (!idToken) {
+        throw new Error('Impossible de récupérer le token d\'authentification');
+      }
+
+      // Appeler l'API de configuration AdSense
+      const response = await fetch('/api/configure-adsense', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          siteId: selectedAdsSiteId,
+          domain: selectedSite.name,
+          adsenseId: adsenseId,
+        }),
       });
-    }, 1500);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Erreur lors de la configuration');
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "✅ AdSense configuré",
+        description: `AdSense a été configuré avec succès pour ${selectedSite.name}`,
+      });
+
+      setIsAdsOpen(false);
+      setSelectedAdsSiteId(null);
+      setAdsenseId("");
+    } catch (error: any) {
+      console.error('Erreur de configuration AdSense:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Erreur",
+        description: error.message || "Une erreur est survenue.",
+      });
+    } finally {
+      setAdsLoading(false);
+    }
   };
 
   const handleRestoreCommit = (commitId: string) => {
@@ -525,38 +568,66 @@ export default function ToolsPage() {
 
       {/* Ads Modal */}
       <Dialog open={isAdsOpen} onOpenChange={setIsAdsOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 sm:max-w-[600px]">
+        <DialogContent className="bg-zinc-950 border-white/10 sm:max-w-[500px]">
           <form onSubmit={handleAdsSubmit}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Megaphone className="h-5 w-5 text-amber-500" />
-                Configuration AdSense (Ads.tsx)
+                Configurer Google AdSense
               </DialogTitle>
               <DialogDescription>
-                Collez ici le code de votre composant d'annonces pour l'injecter dans votre infrastructure.
+                Sélectionnez un site et entrez votre ID AdSense pour l'activer.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-6">
+              {/* Sélection du site */}
               <div className="grid gap-2">
-                <Label htmlFor="adsCode" className="flex items-center gap-2">
-                  <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  Contenu de Ads.tsx
+                <Label className="flex items-center gap-2">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  Sélectionner un site
                 </Label>
-                <Textarea
-                  id="adsCode"
-                  placeholder="import React from 'react';... export const Ads = () => { ... };"
-                  className="bg-zinc-900 border-white/5 font-mono text-xs min-h-[300px]"
-                  value={adsCode}
-                  onChange={(e) => setAdsCode(e.target.value)}
+                <select
+                  value={selectedAdsSiteId || ""}
+                  onChange={(e) => setSelectedAdsSiteId(e.target.value || null)}
+                  className="w-full px-3 py-2 rounded-md bg-zinc-900 border border-white/5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  <option value="">-- Choisir un site --</option>
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name}
+                    </option>
+                  ))}
+                </select>
+                {sites.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground italic">Aucun site déployé. Déploiement d'abord un site.</p>
+                )}
+              </div>
+
+              {/* Input ID AdSense */}
+              <div className="grid gap-2">
+                <Label htmlFor="adsenseId" className="flex items-center gap-2">
+                  <Code2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  ID AdSense
+                </Label>
+                <Input
+                  id="adsenseId"
+                  placeholder="ca-pub-0000000000000000 ou colle ta ligne ads.txt"
+                  className="bg-zinc-900 border-white/5 font-mono text-xs"
+                  value={adsenseId}
+                  onChange={(e) => setAdsenseId(e.target.value)}
                   required
                 />
+                <p className="text-[10px] text-muted-foreground">
+                  Colle l'ID <code>ca-pub-XXXXXXXXXXXXXXXX</code> ou la ligne complète de ads.txt
+                </p>
               </div>
               
               <Alert className="bg-amber-500/5 border-amber-500/10 text-amber-200">
                 <AlertCircle className="h-4 w-4 text-amber-500" />
-                <AlertTitle className="text-xs font-bold uppercase tracking-tight">Vérification</AlertTitle>
+                <AlertTitle className="text-xs font-bold uppercase tracking-tight">Attention</AlertTitle>
                 <AlertDescription className="text-[10px] leading-tight">
-                  Assurez-vous que votre code React est valide et n'inclut pas d'importations externes non supportées.
+                  Cette action créera un fichier <code>ads.txt</code> et injectera le script AdSense dans les fichiers HTML de votre site.
                 </AlertDescription>
               </Alert>
             </div>
@@ -564,17 +635,21 @@ export default function ToolsPage() {
               <Button 
                 type="button" 
                 variant="ghost" 
-                onClick={() => setIsAdsOpen(false)}
+                onClick={() => {
+                  setIsAdsOpen(false);
+                  setSelectedAdsSiteId(null);
+                  setAdsenseId("");
+                }}
                 className="text-xs"
               >
                 Annuler
               </Button>
               <Button 
                 type="submit" 
-                disabled={adsLoading}
+                disabled={adsLoading || sites.length === 0}
                 className="font-bold text-xs px-6"
               >
-                {adsLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Sauvegarder Ads.tsx"}
+                {adsLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Activer AdSense"}
               </Button>
             </DialogFooter>
           </form>
