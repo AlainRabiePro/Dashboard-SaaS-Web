@@ -147,6 +147,19 @@ export default function ToolsPage() {
       return;
     }
 
+    if (toolId === 'save') {
+      setLoadingStates(prev => ({ ...prev, [toolId]: true }));
+      // Simulation d'un "Push" vers l'infrastructure
+      setTimeout(() => {
+        setLoadingStates(prev => ({ ...prev, [toolId]: false }));
+        toast({
+          title: "Push effectué",
+          description: "Vos configurations locales ont été poussées vers l'infrastructure cloud avec succès.",
+        });
+      }, 2000);
+      return;
+    }
+
     setLoadingStates(prev => ({ ...prev, [toolId]: true }));
     
     setTimeout(() => {
