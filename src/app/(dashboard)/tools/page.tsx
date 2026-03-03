@@ -177,13 +177,49 @@ export default function ToolsPage() {
 
     setDeployLoading(true);
     try {
-      await addSite(user.uid, deployForm.domain, `https://${deployForm.domain}`, deployForm.repoUrl);
-      toast({
-        title: "Déploiement lancé",
-        description: `Le déploiement de ${deployForm.domain} a été initialisé.`,
+      // Récupérer le token d'authentification
+      const idToken = await user.getIdToken();
+      if (!idToken) {
+        throw new Error('Impossible de récupérer le token d\'authentification');
+      }
+
+      // Appeler l'API de déploiement
+      const response = await fetch('/api/deploy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          domain: deployForm.domain,
+          repoUrl: deployForm.repoUrl,
+        }),
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Erreur lors du déploiement');
+      }
+
+      const result = await response.json();
+
+      // Sauvegarder le site dans Firestore
+      await addSite(user.uid, deployForm.domain, `https://${deployForm.domain}`, deployForm.repoUrl);
+
+      toast({
+        title: "✅ Déploiement lancé",
+        description: `${deployForm.domain} est maintenant en cours de déploiement.`,
+      });
+
       setIsDeployOpen(false);
       setDeployForm({ domain: "", repoUrl: "" });
+    } catch (error: any) {
+      console.error('Erreur de déploiement:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Erreur de déploiement",
+        description: error.message || "Une erreur est survenue lors du déploiement.",
+      });
     } finally {
       setDeployLoading(false);
     }
