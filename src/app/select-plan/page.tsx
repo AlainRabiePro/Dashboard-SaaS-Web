@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useFirestore, useDoc } from "@/firebase";
-import { doc } from "firebase/firestore";
-import { UserProfile } from "@/lib/firestore-service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,52 +66,72 @@ const PLANS = [
 export default function SelectPlanPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const firestore = useFirestore();
   const [selectedPlanId, setSelectedPlanId] = useState<string>("professional");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
-  // Récupérer le profil utilisateur pour vérifier s'il a déjà un plan
-  const userRef = useMemo(() => 
-    user && firestore ? doc(firestore, "users", user.uid) : null,
-    [user?.uid, firestore]
-  );
-  const { data: profile, loading: profileLoading } = useDoc<UserProfile>(userRef);
-
-  // Rediriger si l'utilisateur n'est pas authentifié
+  // Vérifier si l'utilisateur a un plan dès le montage
   useEffect(() => {
-    if (!user && !isRedirecting) {
-      router.push("/login");
-      setIsRedirecting(true);
-    }
-  }, [user, router, isRedirecting]);
+    let isMounted = true;
 
-  // Rediriger si l'utilisateur a déjà un plan (storageLimit > 0)
-  useEffect(() => {
-    if (!profileLoading && profile && profile.storageLimit && profile.storageLimit > 0) {
-      console.log('✅ Utilisateur avec plan détecté, redirection vers /dashboard');
-      setIsRedirecting(true);
-      router.replace("/dashboard");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, profileLoading]);
+    const checkUserPlan = async () => {
+      // Si pas d'utilisateur, redirect login
+      if (!user) {
+        if (isMounted) {
+          router.push("/login");
+        }
+        return;
+      }
 
-  // Afficher un loader si on vérifie le profil
-  if (profileLoading) {
+      try {
+        // Fetch le profil utilisateur via API pour éviter les subscriptions
+        const token = await user.getIdToken();
+        const response = await fetch('/api/user-profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'x-user-id': user.uid,
+          }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch profile');
+        
+        const data = await response.json();
+        
+        // Si l'utilisateur a déjà un plan, redirect dashboard
+        if (isMounted && data.profile?.storageLimit && data.profile.storageLimit > 0) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        if (isMounted) {
+          setIsChecking(false);
+        }
+      } catch (err) {
+        console.error('Error checking plan:', err);
+        if (isMounted) {
+          setIsChecking(false);
+        }
+      }
+    };
+
+    checkUserPlan();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, router]);
+
+  // Afficher un loader pendant la vérification du plan
+  if (isChecking) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Activity className="h-8 w-8 text-primary animate-pulse" />
-          <p className="text-sm text-muted-foreground font-medium">Chargement...</p>
+          <p className="text-sm text-muted-foreground font-medium">Vérification...</p>
         </div>
       </div>
     );
-  }
-
-  // Si on redirige, ne rien afficher
-  if (isRedirecting) {
-    return null;
   }
 
   const handleSelectPlan = async (planId: string) => {
