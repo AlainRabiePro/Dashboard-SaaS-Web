@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -117,19 +116,6 @@ export default function ToolsPage() {
           </Card>
         ))}
       </div>
-
-      <Card className="border-primary/20 bg-primary/5 p-8 text-center space-y-4">
-        <div className="mx-auto h-12 w-12 bg-primary/20 rounded-full flex items-center justify-center">
-          <Zap className="h-6 w-6 text-primary" />
-        </div>
-        <div className="space-y-2 max-w-md mx-auto">
-          <h2 className="text-xl font-bold">Besoin d'outils personnalisés ?</h2>
-          <p className="text-sm text-muted-foreground">
-            Notre API permet l'intégration de vos propres scripts de déploiement et de monitoring.
-          </p>
-        </div>
-        <Button variant="link" className="text-primary font-bold">Consulter la documentation API</Button>
-      </Card>
     </div>
   );
 }
