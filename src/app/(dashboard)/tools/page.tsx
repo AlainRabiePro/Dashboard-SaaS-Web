@@ -176,6 +176,22 @@ export default function ToolsPage() {
     }
   };
 
+  const handleAdsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adsCode) return;
+
+    setAdsLoading(true);
+    // Simulation d'une sauvegarde de configuration
+    setTimeout(() => {
+      setAdsLoading(false);
+      setIsAdsOpen(false);
+      toast({
+        title: "Configuration Ads.tsx enregistrée",
+        description: "Votre composant publicitaire a été injecté avec succès.",
+      });
+    }, 1500);
+  };
+
   const handleRestoreCommit = (commitId: string) => {
     toast({
       title: "Restauration demandée",
