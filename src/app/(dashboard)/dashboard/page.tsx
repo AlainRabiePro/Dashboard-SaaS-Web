@@ -21,6 +21,7 @@ import {
   Zap
 } from "lucide-react";
 import { UserProfile, Site, Invoice } from "@/lib/firestore-service";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -64,7 +65,7 @@ export default function DashboardPage() {
             <BarChart3 className="mr-2 h-4 w-4" /> Rapports
           </Button>
           <Button size="sm" asChild>
-            <a href="/sites"><Plus className="mr-2 h-4 w-4" /> Nouveau Projet</a>
+            <Link href="/sites"><Plus className="mr-2 h-4 w-4" /> Nouveau Projet</Link>
           </Button>
         </div>
       </div>
@@ -79,7 +80,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeSitesCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">Sur {sites.length} au total</p>
+            <p className="text-xs text-muted-foreground mt-1">Plan {profile?.plan}</p>
           </CardContent>
         </Card>
         <Card className="bg-zinc-950/50 border-white/5 backdrop-blur-sm">
@@ -109,7 +110,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{lastInvoiceAmount.toFixed(2)} €</div>
-            <p className="text-xs text-muted-foreground mt-1">Plan {profile?.plan}</p>
+            <p className="text-xs text-muted-foreground mt-1">Auto-renouvellement</p>
           </CardContent>
         </Card>
       </div>
@@ -142,10 +143,10 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-4 space-y-1.5">
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                      <span>Utilisation</span>
+                      <span>Consommation</span>
                       <span>{site.storageUsed?.toFixed(2)} GB</span>
                     </div>
-                    <Progress value={(site.storageUsed / (storageLimit / sites.length || 1)) * 100} className="h-1 bg-zinc-900" />
+                    <Progress value={(site.storageUsed / (storageLimit / Math.max(1, sites.length))) * 100} className="h-1 bg-zinc-900" />
                   </div>
                 </CardContent>
               </Card>
@@ -157,7 +158,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold tracking-tight">Analyse de stockage</h2>
           <Card className="bg-zinc-950/50 border-white/5 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Quota Global</CardTitle>
+              <CardTitle className="text-sm font-medium">Quota Global ({profile?.plan})</CardTitle>
               <CardDescription>Consommation par rapport à votre limite de plan.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -198,7 +199,7 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter>
               <Button variant="outline" className="w-full text-xs h-8 border-white/5 hover:bg-white/5" asChild>
-                <a href="/storage">Détails techniques</a>
+                <Link href="/storage">Détails techniques</Link>
               </Button>
             </CardFooter>
           </Card>

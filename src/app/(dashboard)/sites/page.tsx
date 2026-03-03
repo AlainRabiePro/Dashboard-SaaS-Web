@@ -3,26 +3,29 @@
 
 import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useFirestore, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { useFirestore, useCollection, useDoc } from "@/firebase";
+import { collection, query, orderBy, doc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { addSite, Site } from "@/lib/firestore-service";
-import { ExternalLink, Plus, Settings, Globe, Loader2, Terminal } from "lucide-react";
+import { addSite, Site, UserProfile } from "@/lib/firestore-service";
+import { ExternalLink, Plus, Settings, Globe, Loader2, Terminal, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SitesPage() {
   const { user } = useAuth();
   const firestore = useFirestore();
 
+  const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const sitesQuery = useMemo(() => 
     user ? query(collection(firestore, "users", user.uid, "sites"), orderBy("createdAt", "desc")) : null
   , [firestore, user]);
 
+  const { data: profile } = useDoc<UserProfile>(profileRef);
   const { data: sites, loading } = useCollection<Site>(sitesQuery);
   
   const [isAdding, setIsAdding] = useState(false);
@@ -30,8 +33,10 @@ export default function SitesPage() {
   const [newSiteUrl, setNewSiteUrl] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
+  const canAddSite = profile?.plan !== 'Starter' || sites.length < 1;
+
   async function handleAddSite() {
-    if (!newSiteName || !newSiteUrl || !user) return;
+    if (!newSiteName || !newSiteUrl || !user || !canAddSite) return;
     setIsAdding(true);
     try {
       await addSite(user.uid, newSiteName, newSiteUrl);
@@ -52,7 +57,7 @@ export default function SitesPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="font-semibold">
+            <Button className="font-semibold" disabled={!canAddSite && !loading}>
               <Plus className="mr-2 h-4 w-4" /> Nouveau Projet
             </Button>
           </DialogTrigger>
@@ -63,32 +68,47 @@ export default function SitesPage() {
                 Déployez une nouvelle application sur SaasFlow.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Nom du site</label>
-                <Input 
-                  placeholder="e.g. My Awesome App" 
-                  value={newSiteName}
-                  onChange={(e) => setNewSiteName(e.target.value)}
-                  className="bg-zinc-900 border-white/5"
-                />
+            {!canAddSite ? (
+              <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Limite atteinte</AlertTitle>
+                <AlertDescription>
+                  Votre plan Starter est limité à 1 site web. Passez au plan Professional pour des sites illimités.
+                </AlertDescription>
+                <Button variant="link" className="p-0 h-auto text-xs font-bold uppercase mt-2" asChild>
+                  <Link href="/storage">Upgrade Maintenant</Link>
+                </Button>
+              </Alert>
+            ) : (
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Nom du site</label>
+                  <Input 
+                    placeholder="e.g. My Awesome App" 
+                    value={newSiteName}
+                    onChange={(e) => setNewSiteName(e.target.value)}
+                    className="bg-zinc-900 border-white/5"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">URL de Production</label>
+                  <Input 
+                    placeholder="https://example.com" 
+                    value={newSiteUrl}
+                    onChange={(e) => setNewSiteUrl(e.target.value)}
+                    className="bg-zinc-900 border-white/5"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">URL de Production</label>
-                <Input 
-                  placeholder="https://example.com" 
-                  value={newSiteUrl}
-                  onChange={(e) => setNewSiteUrl(e.target.value)}
-                  className="bg-zinc-900 border-white/5"
-                />
-              </div>
-            </div>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsOpen(false)}>Annuler</Button>
-              <Button onClick={handleAddSite} disabled={isAdding}>
-                {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Déployer
-              </Button>
+              {canAddSite && (
+                <Button onClick={handleAddSite} disabled={isAdding}>
+                  {isAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Déployer
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
