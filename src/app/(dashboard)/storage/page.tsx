@@ -221,11 +221,11 @@ export default function StoragePage() {
                     </DialogHeader>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {pricingPlans.map((plan) => {
+                      {pricingPlans.map((plan, index) => {
                         const isCurrent = profile?.plan === plan.name;
                         return (
                           <div 
-                            key={plan.name} 
+                            key={`${plan.name}-${index}`} 
                             className={`relative flex flex-col p-8 rounded-[2rem] border border-white/10 bg-zinc-900/30 transition-all hover:bg-zinc-900/50 ${isCurrent ? 'ring-2 ring-primary ring-offset-4 ring-offset-zinc-950' : ''}`}
                           >
                             {plan.isPopular && (
@@ -309,8 +309,8 @@ export default function StoragePage() {
                     <div className="mt-6 pt-6 border-t border-white/5">
                       <h4 className="text-sm font-semibold mb-3">Détail par projet</h4>
                       <div className="space-y-2">
-                        {chartData.map((site) => (
-                          <div key={site.name} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                        {chartData.map((site, index) => (
+                          <div key={`${site.name}-${index}`} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                             <span className="text-sm">{site.name}</span>
                             <span className="text-sm font-semibold text-primary">{formatStorage(site.value)}</span>
                           </div>
