@@ -22,7 +22,10 @@ import {
   X,
   FileCode,
   Bug,
-  Clock
+  Clock,
+  Zap,
+  PlayCircle,
+  TestTube
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -71,6 +74,9 @@ export default function ConsolePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("files");
+  const [isBuilding, setIsBuilding] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const editorRef = useRef<any>(null);
 
   // Fetch projects on mount
@@ -167,6 +173,60 @@ export default function ConsolePage() {
     }
   };
 
+  const executeCommand = async (command: 'build' | 'run' | 'test') => {
+    if (!selectedProject || !user?.uid) return;
+
+    const commandMap = {
+      build: 'npm run build',
+      run: 'npm run dev',
+      test: 'npm test'
+    };
+
+    const setState = {
+      build: setIsBuilding,
+      run: setIsRunning,
+      test: setIsTesting
+    }[command];
+
+    setState(true);
+    try {
+      const response = await fetch('/api/console/execute', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+          'x-project-id': selectedProject,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          command: commandMap[command]
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Add output to logs
+        if (data.output) {
+          const newLog: LogEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            message: `${command.toUpperCase()}: ${data.output.substring(0, 200)}...`,
+            source: 'CLI'
+          };
+          setLogs([newLog, ...logs]);
+        }
+        alert(`${command.charAt(0).toUpperCase() + command.slice(1)} exécuté avec succès!`);
+      } else {
+        alert(`Erreur lors de l'exécution de ${command}`);
+      }
+    } catch (error) {
+      console.error(`Error executing ${command}:`, error);
+      alert(`Erreur lors de l'exécution de ${command}`);
+    } finally {
+      setState(false);
+    }
+  };
+
   const handleEditorChange = (value: string | undefined) => {
     if (selectedFile && value !== undefined) {
       setSelectedFile({
@@ -220,7 +280,7 @@ export default function ConsolePage() {
           <div className="flex items-center gap-4">
             <label className="text-sm font-medium min-w-fit">Sélectionner un projet:</label>
             <Select value={selectedProject} onValueChange={setSelectedProject}>
-              <SelectTrigger className="w-full bg-white/5 border-white/10">
+              <SelectTrigger className="bg-white/5 border-white/10">
                 <SelectValue placeholder="Choisir un projet..." />
               </SelectTrigger>
               <SelectContent className="bg-zinc-950 border-white/5">
@@ -268,6 +328,45 @@ export default function ConsolePage() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => executeCommand('build')}
+                    disabled={!selectedProject || isBuilding}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isBuilding ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2" />
+                    )}
+                    Build
+                  </Button>
+                  <Button
+                    onClick={() => executeCommand('run')}
+                    disabled={!selectedProject || isRunning}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isRunning ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <PlayCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Run
+                  </Button>
+                  <Button
+                    onClick={() => executeCommand('test')}
+                    disabled={!selectedProject || isTesting}
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {isTesting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <TestTube className="h-4 w-4 mr-2" />
+                    )}
+                    Test
+                  </Button>
                   <Button 
                     size="sm"
                     variant="outline"
