@@ -97,10 +97,10 @@ ${nginxConfigContent}
 EOF`);
 
     // Activer la configuration nginx
-    await ssh.execCommand(`ln -sf ${nginxConfig} /etc/nginx/sites-enabled/${siteName} || true`);
+    await ssh.execCommand(`ln -sf ${nginxConfig} /etc/nginx/sites-enabled/${folderName} || true`);
     
-    // 🔗 Créer un lien symbolique vers /var/www/{siteName} pour l'accès direct
-    const shortcutPath = `/var/www/${siteName}`;
+    // 🔗 Créer un lien symbolique vers /var/www/{folderName} pour l'accès direct
+    const shortcutPath = `/var/www/${folderName}`;
     console.log(`🔗 Création du lien symbolique: ${shortcutPath} -> ${siteDir}`);
     
     // Nettoyer complètement les anciens symlinks (en cas de redéploiement)

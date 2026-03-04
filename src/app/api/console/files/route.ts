@@ -201,23 +201,27 @@ export async function GET(request: NextRequest) {
 
     const projectData = projectSnap.data();
     const projectName = projectData?.siteName || projectData?.name || 'Mon Projet';
-    const domain = projectData?.domain || '';
+    let domain = projectData?.domain || '';
+    
+    // Si domain est vide, essayer de l'extraire de siteName/name (compatibilité avec sites existants)
+    if (!domain) {
+      // Extraire le domaine du siteName si c'est une URL/domaine
+      if (projectName && projectName.includes('.')) {
+        domain = projectName;
+      } else {
+        // Sinon utiliser le nom du projet formaté
+        domain = projectName;
+      }
+    }
     
     console.log(`📂 Récupération fichiers pour ${projectId}:`);
     console.log(`   Projet: ${projectName}`);
     console.log(`   Domaine utilisé: ${domain || '(vide)'}`);
     
     // Construire le chemin du projet: /var/www/{domain}
-    // Utiliser le domaine directement (le symlink est créé avec le domaine exact)
-    let projectPath = '';
-    
-    if (domain) {
-      projectPath = `/var/www/${domain}`;
-    } else {
-      // Fallback: utiliser le nom du projet formaté
-      const siteName = projectName.toLowerCase().replace(/\s+/g, '-');
-      projectPath = `/var/www/${siteName}`;
-    }
+    // Normaliser le domaine : "instacraft.fr" -> "instacraft-fr"
+    const normalizedDomain = domain.toLowerCase().replace(/\./g, '-').replace(/\s+/g, '-');
+    const projectPath = `/var/www/${normalizedDomain}`;
     
     console.log(`   Chemin: ${projectPath}`);
 
@@ -236,13 +240,12 @@ export async function GET(request: NextRequest) {
       console.warn(`   → Tentative lecture via SSH...`);
       
       // Essayer de lire via SSH depuis le VPS
-      const sshPath = projectPath.startsWith('/var/www/') ? projectPath : `/var/www/${domain || projectName}`;
-      console.log(`   Chemin SSH: ${sshPath}`);
-      files = await readProjectFilesViaSSH(sshPath);
+      console.log(`   Chemin SSH: ${projectPath}`);
+      files = await readProjectFilesViaSSH(projectPath);
       
       if (files.length === 0) {
         // Si SSH aussi échoue, retourner le message par défaut
-        console.warn(`❌ Aucun fichier lus via SSH: ${sshPath}`);
+        console.warn(`❌ Aucun fichier lus via SSH: ${projectPath}`);
         return NextResponse.json({
           files: [
             {
