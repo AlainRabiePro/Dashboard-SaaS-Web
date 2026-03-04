@@ -6,12 +6,45 @@ import { Badge } from "@/components/ui/badge";
 import { GitBranch, CheckCircle, AlertCircle, Clock, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CommitsList } from "@/components/commits-list";
 
 export default function DeploymentsPage() {
   const { user } = useAuth();
   const [deployments, setDeployments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>("");
 
+  // Fetch projects
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user?.uid) return;
+
+      try {
+        const response = await fetch('/api/console/projects', {
+          headers: { 'x-user-id': user.uid }
+        });
+        const data = await response.json();
+        setProjects(data.projects || []);
+        if (data.projects?.length > 0) {
+          setSelectedProject(data.projects[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    };
+
+    fetchProjects();
+  }, [user?.uid]);
+
+  // Fetch deployments
   useEffect(() => {
     const fetchDeployments = async () => {
       if (!user) return;
@@ -83,6 +116,41 @@ export default function DeploymentsPage() {
       </div>
 
       <div className="grid gap-6">
+        {/* Commits by Project */}
+        {projects.length > 0 && (
+          <Card className="border-white/5 bg-zinc-950/50 backdrop-blur-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Sélectionner un projet</CardTitle>
+              </div>
+              <CardDescription>Afficher les commits récents</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <SelectTrigger className="bg-white/5 border-white/10 max-w-xs">
+                  <SelectValue placeholder="Choisir un projet..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Commits List */}
+        {selectedProject && (
+          <CommitsList
+            repoUrl={projects.find(p => p.id === selectedProject)?.repositoryUrl}
+            title="Commits récents du projet"
+            maxCommits={10}
+          />
+        )}
+
         <Card className="border-white/5 bg-zinc-950/50 backdrop-blur-sm">
           <CardHeader>
             <div className="flex items-center justify-between">

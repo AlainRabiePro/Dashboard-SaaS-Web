@@ -25,7 +25,9 @@ import {
   Clock,
   Zap,
   PlayCircle,
-  TestTube
+  TestTube,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -59,6 +61,7 @@ interface Project {
   id: string;
   name: string;
   domain: string;
+  repositoryUrl?: string;
 }
 
 export default function ConsolePage() {
@@ -77,6 +80,9 @@ export default function ConsolePage() {
   const [isBuilding, setIsBuilding] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [lastCommandStatus, setLastCommandStatus] = useState<'success' | 'error' | null>(null);
+  const [lastCommandOutput, setLastCommandOutput] = useState<string>("");
+  const [logsTabRef, setLogsTabRef] = useState<HTMLElement | null>(null);
   const editorRef = useRef<any>(null);
 
   // Fetch projects on mount
@@ -139,8 +145,20 @@ export default function ConsolePage() {
 
     fetchData();
     
-    // Refresh logs every 5 seconds
-    const interval = setInterval(fetchData, 5000);
+    // Refresh only logs every 10 seconds (not files)
+    const interval = setInterval(async () => {
+      if (!user?.uid || !selectedProject) return;
+      try {
+        const logsRes = await fetch('/api/console/logs', {
+          headers: { 'x-user-id': user.uid, 'x-project-id': selectedProject }
+        });
+        const logsData = await logsRes.json();
+        setLogs(logsData.logs || []);
+      } catch (error) {
+        console.error('Error fetching logs:', error);
+      }
+    }, 10000);
+    
     return () => clearInterval(interval);
   }, [user?.uid, selectedProject]);
 
@@ -188,6 +206,9 @@ export default function ConsolePage() {
       test: setIsTesting
     }[command];
 
+    const project = projects.find(p => p.id === selectedProject);
+    if (!project) return;
+
     setState(true);
     try {
       const response = await fetch('/api/console/execute', {
@@ -195,6 +216,8 @@ export default function ConsolePage() {
         headers: {
           'x-user-id': user.uid,
           'x-project-id': selectedProject,
+          'x-project-name': project.name,
+          'x-domain': project.domain,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -205,23 +228,34 @@ export default function ConsolePage() {
       const data = await response.json();
       
       if (response.ok) {
-        // Add output to logs
-        if (data.output) {
-          const newLog: LogEntry = {
-            timestamp: new Date().toISOString(),
-            level: 'info',
-            message: `${command.toUpperCase()}: ${data.output.substring(0, 200)}...`,
-            source: 'CLI'
-          };
-          setLogs([newLog, ...logs]);
+        // Rafraîchir immédiatement les logs depuis la store
+        try {
+          const logsRes = await fetch('/api/console/logs', {
+            headers: { 'x-user-id': user.uid, 'x-project-id': selectedProject }
+          });
+          const logsData = await logsRes.json();
+          setLogs(logsData.logs || []);
+          
+          // Récupérer le dernier log pour afficher
+          if (logsData.logs && logsData.logs.length > 0) {
+            const lastLog = logsData.logs[logsData.logs.length - 1];
+            setLastCommandOutput(lastLog.message);
+          }
+        } catch (logError) {
+          console.error('Error refreshing logs:', logError);
         }
-        alert(`${command.charAt(0).toUpperCase() + command.slice(1)} exécuté avec succès!`);
+
+        // Déterminer le statut basé sur le code de sortie
+        const isSuccess = data.exitCode === 0;
+        setLastCommandStatus(isSuccess ? 'success' : 'error');
       } else {
-        alert(`Erreur lors de l'exécution de ${command}`);
+        setLastCommandStatus('error');
+        setLastCommandOutput(data.error || 'Erreur lors de l\'exécution');
       }
     } catch (error) {
       console.error(`Error executing ${command}:`, error);
-      alert(`Erreur lors de l'exécution de ${command}`);
+      setLastCommandStatus('error');
+      setLastCommandOutput(`Erreur lors de l'exécution de ${command}`);
     } finally {
       setState(false);
     }
@@ -233,6 +267,23 @@ export default function ConsolePage() {
         ...selectedFile,
         content: value
       });
+    }
+  };
+
+  const handleFind = () => {
+    if (editorRef.current && searchQuery) {
+      // Utiliser le Find widget natif de Monaco
+      const action = editorRef.current.getAction('actions.find');
+      if (action) {
+        action.run().then(() => {
+          // Pré-remplir le champ de recherche
+          const findInput = document.querySelector('.find-widget input') as HTMLInputElement;
+          if (findInput) {
+            findInput.value = searchQuery;
+            findInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+      }
     }
   };
 
@@ -268,7 +319,7 @@ export default function ConsolePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Console Débuger</h1>
         <p className="text-muted-foreground italic">Éditeur intégré avec syntax highlighting, recherche/remplacement et logs en temps réel.</p>
@@ -422,8 +473,16 @@ export default function ConsolePage() {
                         placeholder="Entrez le texte à chercher..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleFind()}
                         className="bg-white/5 border-white/10"
                       />
+                      <Button
+                        size="sm"
+                        onClick={handleFind}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Search className="h-4 w-4" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -522,7 +581,7 @@ export default function ConsolePage() {
             </Card>
 
             {/* All Logs */}
-            <Card className="border-white/5 bg-zinc-950/50 backdrop-blur-sm">
+            <Card className="border-white/5 bg-zinc-950/50 backdrop-blur-sm" data-logs-section>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Terminal className="h-5 w-5 text-blue-500" />
@@ -547,6 +606,39 @@ export default function ConsolePage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Command Execution Status Bar */}
+      {lastCommandStatus && (
+        <div
+          onClick={() => {
+            setActiveTab('logs');
+            // Scroll to logs section
+            setTimeout(() => {
+              const logsSection = document.querySelector('[data-logs-section]');
+              logsSection?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}
+          className={`fixed bottom-0 left-0 right-0 py-2 px-4 cursor-pointer transition-all z-50 ${
+            lastCommandStatus === 'success'
+              ? 'bg-green-900/20 border-t border-green-500/30'
+              : 'bg-red-900/20 border-t border-red-500/30'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm">
+            {lastCommandStatus === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className={`text-xs font-medium truncate ${lastCommandStatus === 'success' ? 'text-green-300' : 'text-red-300'}`}>
+                {lastCommandStatus === 'success' ? '✓ Succès' : '✗ Erreur'} • {lastCommandOutput}
+              </p>
+            </div>
+            <div className="text-xs text-gray-500 flex-shrink-0">Cliquez pour voir les logs</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

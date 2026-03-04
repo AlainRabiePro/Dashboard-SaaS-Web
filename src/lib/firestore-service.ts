@@ -139,14 +139,19 @@ export function updateSite(uid: string, siteId: string, data: Partial<Site>) {
   });
 }
 
-export function deleteSite(uid: string, siteId: string) {
+export async function deleteSite(uid: string, siteId: string): Promise<void> {
   const siteRef = doc(db, "users", uid, "sites", siteId);
-  deleteDoc(siteRef).catch(async (err) => {
+  try {
+    await deleteDoc(siteRef);
+    console.log(`✅ Projet ${siteId} supprimé de Firestore`);
+  } catch (err) {
+    console.error(`❌ Erreur suppression Firestore:`, err);
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: siteRef.path,
       operation: 'delete'
     }));
-  });
+    throw err;
+  }
 }
 
 export function updateUserPlan(uid: string, plan: UserProfile['plan'], storageLimit: number) {

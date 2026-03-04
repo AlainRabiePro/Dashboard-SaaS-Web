@@ -22,40 +22,33 @@ const readProjectFilesViaSSH = async (projectPath: string, maxFiles: number = 50
     const SSH = require('node-ssh').NodeSSH;
     const ssh = new SSH();
 
-    console.log(`🔗 Connexion SSH au VPS...`);
     await ssh.connect({
       host: process.env.DEPLOY_SSH_HOST,
       username: process.env.DEPLOY_SSH_USER,
       password: process.env.DEPLOY_SSH_PASSWORD,
     });
-    console.log(`✅ SSH connecté à ${process.env.DEPLOY_SSH_HOST}`);
 
     const files: FileContent[] = [];
     
     // Vérifier que le répertoire existe
     const testCmd = `[ -d "${projectPath}" ] && echo "EXISTS" || echo "NOT_FOUND"`;
     const testResult = await ssh.execCommand(testCmd);
-    console.log(`   Test répertoire ${projectPath}:`, testResult.stdout.trim());
     
     if (!testResult.stdout.includes('EXISTS')) {
-      console.warn(`❌ Répertoire n'existe pas: ${projectPath}`);
       ssh.dispose();
       return [];
     }
     
     // Lire les fichiers de manière récursive via SSH
     const findCmd = `find ${projectPath} -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.next/*' | head -${maxFiles}`;
-    console.log(`   Exécution find...`);
     const findResult = await ssh.execCommand(findCmd);
     
     if (findResult.code !== 0) {
-      console.warn(`❌ SSH find failed (code ${findResult.code}): ${findResult.stderr}`);
       ssh.dispose();
       return [];
     }
 
     const fileList = findResult.stdout.split('\n').filter(Boolean);
-    console.log(`   ✅ Fichiers trouvés: ${fileList.length}`);
     
     for (const filePath of fileList) {
       if (files.length >= maxFiles) break;
@@ -214,16 +207,10 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    console.log(`📂 Récupération fichiers pour ${projectId}:`);
-    console.log(`   Projet: ${projectName}`);
-    console.log(`   Domaine utilisé: ${domain || '(vide)'}`);
-    
     // Construire le chemin du projet: /var/www/{domain}
     // Normaliser le domaine : "instacraft.fr" -> "instacraft-fr"
     const normalizedDomain = domain.toLowerCase().replace(/\./g, '-').replace(/\s+/g, '-');
     const projectPath = `/var/www/${normalizedDomain}`;
-    
-    console.log(`   Chemin: ${projectPath}`);
 
     // Vérifier que le dossier existe localement ou sur le VPS
     let files: FileContent[] = [];
@@ -232,20 +219,13 @@ export async function GET(request: NextRequest) {
       await fs.access(projectPath);
       // Lire localement si le chemin existe
       files = await readProjectFiles(projectPath);
-      console.log(`✅ Fichiers lus localement depuis ${projectPath}`);
     } catch (err: any) {
       // Si le dossier n'existe pas localement, essayer via SSH (déploiement sur VPS)
-      console.warn(`⚠️ Dossier inexistant localement: ${projectPath}`);
-      console.warn(`   Erreur locale:`, err.code);
-      console.warn(`   → Tentative lecture via SSH...`);
-      
       // Essayer de lire via SSH depuis le VPS
-      console.log(`   Chemin SSH: ${projectPath}`);
       files = await readProjectFilesViaSSH(projectPath);
       
       if (files.length === 0) {
         // Si SSH aussi échoue, retourner le message par défaut
-        console.warn(`❌ Aucun fichier lus via SSH: ${projectPath}`);
         return NextResponse.json({
           files: [
             {

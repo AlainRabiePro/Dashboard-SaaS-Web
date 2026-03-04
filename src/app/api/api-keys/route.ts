@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { randomBytes } from 'crypto';
 import { initializeApp, getApps } from 'firebase/app';
 
@@ -24,6 +24,7 @@ async function initializeApiKeys(userId: string) {
     key: defaultKey,
     createdAt: Timestamp.now(),
     lastUsed: null,
+    active: true,
   }).catch(err => console.error('Error initializing API key:', err));
 }
 
@@ -46,18 +47,20 @@ export async function GET(request: NextRequest) {
       const keysSnap2 = await getDocs(keysRef);
       const keys = keysSnap2.docs.map(doc => ({
         id: doc.id,
-        ...doc.data() as any,
+        name: (doc.data() as any).name,
         key: `${((doc.data() as any).key || '').substring(0, 10)}••••••••••••••`,
         createdAt: ((doc.data() as any).createdAt?.toDate?.() || new Date()),
+        active: ((doc.data() as any).active !== false),
       }));
       return NextResponse.json({ keys });
     }
     
     const keys = keysSnap.docs.map(doc => ({
       id: doc.id,
-      ...doc.data() as any,
+      name: (doc.data() as any).name,
       key: `${((doc.data() as any).key || '').substring(0, 10)}••••••••••••••`,
       createdAt: ((doc.data() as any).createdAt?.toDate?.() || new Date()),
+      active: ((doc.data() as any).active !== false),
     }));
 
     return NextResponse.json({ keys });
@@ -86,11 +89,41 @@ export async function POST(request: NextRequest) {
       key: newKey,
       createdAt: Timestamp.now(),
       lastUsed: null,
+      active: true,
     });
 
-    return NextResponse.json({ success: true, id: docRef.id, key: newKey });
+    return NextResponse.json({ 
+      success: true, 
+      id: docRef.id, 
+      key: newKey,
+      name,
+      createdAt: new Date(),
+      active: true,
+    });
   } catch (error: any) {
     console.error('Error creating API key:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id');
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { keyId } = await request.json();
+    if (!keyId) {
+      return NextResponse.json({ error: 'Key ID is required' }, { status: 400 });
+    }
+
+    const keyRef = doc(db, 'users', userId, 'apiKeys', keyId);
+    await deleteDoc(keyRef);
+
+    return NextResponse.json({ success: true, message: 'API key deleted' });
+  } catch (error: any) {
+    console.error('Error deleting API key:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

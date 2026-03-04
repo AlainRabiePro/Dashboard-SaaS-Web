@@ -24,9 +24,6 @@ export async function POST(request: NextRequest) {
     // - Un bucket de stockage (Google Cloud Storage, AWS S3)
     // - Une base de données (Firestore)
     // - Envoyer une notification de modification
-    
-    console.log(`Sauvegarde du fichier ${path} pour l'utilisateur ${userId}`);
-    console.log(`Contenu: ${content.substring(0, 100)}...`);
 
     // Simuler une sauvegarde réussie
     return NextResponse.json({
@@ -38,7 +35,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error saving file:', error);
     return NextResponse.json(
       { error: 'Erreur lors de la sauvegarde du fichier' },
       { status: 500 }

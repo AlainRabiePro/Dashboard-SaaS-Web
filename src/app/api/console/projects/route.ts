@@ -18,6 +18,7 @@ interface Project {
   id: string;
   name: string;
   domain: string;
+  repositoryUrl?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest) {
       projects.push({
         id: doc.id,
         name: data.siteName || data.name || 'Sans nom',
-        domain: data.domain || 'Pas de domaine'
+        domain: data.domain || data.siteName || data.name || '',
+        repositoryUrl: data.repositoryUrl || undefined
       });
     });
 
@@ -50,7 +52,6 @@ export async function GET(request: NextRequest) {
       total: projects.length
     });
   } catch (error) {
-    console.error('Error fetching projects:', error);
     return NextResponse.json(
       { error: 'Erreur lors du chargement des projets' },
       { status: 500 }

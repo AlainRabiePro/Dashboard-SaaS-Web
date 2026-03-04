@@ -84,7 +84,7 @@ export default function SiteSettingsPage() {
     if (!user || !site) return;
     setIsDeleting(true);
     try {
-      // Appeler l'API pour supprimer du VPS et Firestore
+      // Étape 1: Supprimer du VPS via l'API
       const token = await user.getIdToken();
       const response = await fetch("/api/delete-site", {
         method: "POST",
@@ -98,14 +98,17 @@ export default function SiteSettingsPage() {
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Erreur lors de la suppression");
+      // Même si le VPS échoue, on continue pour supprimer Firestore
+      const vpsData = response.ok ? await response.json() : null;
+      if (vpsData) {
+        console.log("✅ VPS supprimé:", vpsData);
+      } else {
+        console.warn("⚠️ Erreur suppression VPS, mais on continue avec Firestore");
       }
 
-      const data = await response.json();
-      console.log("✅ Réponse suppression:", data);
-
+      // Étape 2: Supprimer de Firestore côté client (avec permissions utilisateur)
+      await deleteSite(user.uid, siteId);
+      
       toast({
         title: "Projet supprimé",
         description: "Le site a été retiré de votre compte et du VPS.",
