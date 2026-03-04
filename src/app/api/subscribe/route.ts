@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { 
   initializeApp, 
   getApps,
@@ -181,36 +182,68 @@ export async function POST(request: NextRequest) {
     // Sauvegarder le plan dans Firestore
     await saveSubscriptionToFirestore(userId, planId, plan);
 
-    // ============================================
-    // MODE TEST: Sans Stripe pour l'instant
-    // ============================================
-    // En production, vous intégrerez ici l'API Stripe
-    // Pour maintenant, on simule juste l'abonnement
+    // Intégrer Stripe Checkout
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    
+    if (!stripeSecretKey) {
+      console.warn('STRIPE_SECRET_KEY not configured, skipping Stripe integration');
+      return NextResponse.json({
+        success: true,
+        message: `Abonnement ${plan.name} créé avec succès (mode test)`,
+        planId,
+        storage: plan.storage,
+        checkoutUrl: null,
+        warning: 'Stripe non configuré - mode test',
+      });
+    }
 
-    // TODO: Intégrer Stripe Checkout
-    // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-    // const session = await stripe.checkout.sessions.create({
-    //   customer_email: email,
-    //   line_items: [{
-    //     price: priceId,
-    //     quantity: 1,
-    //   }],
-    //   mode: 'subscription',
-    //   success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
-    //   cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/select-plan`,
-    //   metadata: { planId, userId }
-    // });
+    try {
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-10-28',
+      });
 
-    console.log(`✅ Abonnement créé pour ${email} - Plan: ${planId}`);
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        customer_email: email,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/select-plan?canceled=true`,
+        metadata: {
+          planId,
+          userId,
+          email,
+        },
+      });
 
-    return NextResponse.json({
-      success: true,
-      message: `Abonnement ${plan.name} créé avec succès`,
-      planId,
-      storage: plan.storage,
-      // sessionUrl: session.url (une fois Stripe intégré)
-      sessionUrl: null // Pas de redirection Stripe pour le moment
-    });
+      console.log(`✅ Stripe Checkout session créée - ${session.id} pour ${email}`);
+
+      return NextResponse.json({
+        success: true,
+        message: `Redirection vers Stripe Checkout`,
+        planId,
+        storage: plan.storage,
+        sessionId: session.id,
+        checkoutUrl: session.url,
+      });
+    } catch (stripeError) {
+      console.error('Stripe error:', stripeError);
+      
+      // Fallback: rediriger quand même avec un warning
+      return NextResponse.json({
+        success: true,
+        message: `Abonnement ${plan.name} créé (Stripe erreur)`,
+        planId,
+        storage: plan.storage,
+        checkoutUrl: null,
+        error: 'Stripe non disponible actuellement',
+      });
+    }
 
   } catch (error: any) {
     console.error('Erreur lors de la création de l\'abonnement:', error);

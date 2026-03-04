@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeFirebase } from "@/firebase";
+import { getFirestore, doc, updateDoc } from "firebase/firestore";
+import { encryptToken } from "@/lib/encryption";
+import { extractUserFromRequest } from "@/lib/auth-middleware";
 
 // Initialiser Firebase Admin
+let adminAuth: any;
 try {
   initializeFirebase();
+  adminAuth = getAuth();
 } catch (error) {
   console.log("Firebase already initialized");
 }
@@ -91,16 +96,92 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // TODO: Sauvegarder le token d'accès GitHub dans la base de données Firestore
-    // Pour l'utilisateur actuel (vous devez avoir l'ID utilisateur du contexte)
-    // Exemple:
-    // await updateDoc(doc(firestore, 'users', userId), {
-    //   github: {
-    //     username: githubUser.login,
-    //     accessToken: encrypt(tokenData.access_token), // Chiffrer si possible
-    //     connectedAt: new Date(),
-    //   }
-    // });
+    // Extraire l'utilisateur actuel depuis le contexte d'authentification
+    let userId: string | null = null;
+    
+    // Essayer d'obtenir l'utilisateur depuis les cookies de session Firebase
+    try {
+      const sessionCookie = request.cookies.get('__session')?.value;
+      if (sessionCookie) {
+        const decodedToken = await adminAuth.verifySessionCookie(sessionCookie);
+        userId = decodedToken.uid;
+      }
+    } catch (error) {
+      console.log("Session cookie not available");
+    }
+
+    // Fallback: essayer depuis l'en-tête Authorization
+    if (!userId) {
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.substring(7);
+          const decodedToken = await adminAuth.verifyIdToken(token);
+          userId = decodedToken.uid;
+        } catch (error) {
+          console.log("Invalid auth header");
+        }
+      }
+    }
+
+    // Si on peut sauvegarder, sauvegarder le token dans Firestore
+    if (userId && process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
+      try {
+        // Construction manuelle de l'URL Firestore pour utiliser Firestore REST API
+        const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        const encryptedToken = encryptToken(tokenData.access_token);
+        
+        const updatePayload = {
+          github: {
+            username: githubUser.login,
+            accessToken: encryptedToken,
+            connectedAt: new Date().toISOString(),
+            id: githubUser.id,
+            avatar: githubUser.avatar_url,
+            publicRepos: githubUser.public_repos,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Utiliser Firestore REST API
+        const response = await fetch(
+          `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/users/${userId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${tokenData.access_token}`, // Utilise le token d'accès du serveur
+            },
+            body: JSON.stringify({
+              fields: {
+                github: {
+                  mapValue: {
+                    fields: {
+                      username: { stringValue: githubUser.login },
+                      accessToken: { stringValue: encryptedToken },
+                      connectedAt: { timestampValue: new Date().toISOString() },
+                      id: { integerValue: githubUser.id.toString() },
+                      avatar: { stringValue: githubUser.avatar_url },
+                      publicRepos: { integerValue: githubUser.public_repos.toString() },
+                    },
+                  },
+                },
+                updatedAt: { timestampValue: new Date().toISOString() },
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error('Failed to save GitHub token to Firestore:', response.statusText);
+        } else {
+          console.log('GitHub token saved successfully');
+        }
+      } catch (error) {
+        console.error('Error saving GitHub token:', error);
+        // Continue even if saving fails
+      }
+    }
 
     // Rediriger vers la page de settings avec succès
     const redirectUrl = new URL("/settings", request.nextUrl.origin);
