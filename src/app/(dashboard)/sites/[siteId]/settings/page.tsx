@@ -36,6 +36,7 @@ export default function SiteSettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRedeploying, setIsRedeploying] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const siteRef = useMemo(() => 
@@ -131,7 +132,44 @@ export default function SiteSettingsPage() {
     }
   }
 
-  if (loading) {
+  async function handleRedeploy() {
+    if (!user || !site) return;
+    setIsRedeploying(true);
+    try {
+      const response = await fetch("/api/deploy-site", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.uid,
+        },
+        body: JSON.stringify({
+          siteName: site.name,
+          domain: site.domain,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Erreur lors du redéploiement");
+      }
+
+      const data = await response.json();
+      console.log("✅ Redéploiement réussi:", data);
+
+      toast({
+        title: "Projet redéployé",
+        description: "Votre site a été redéployé sur le serveur avec succès.",
+      });
+    } catch (error: any) {
+      console.error("❌ Erreur redéploiement:", error);
+      toast({
+        title: "Erreur de redéploiement",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsRedeploying(false);
+    }
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -241,6 +279,28 @@ export default function SiteSettingsPage() {
         </div>
 
         <div className="space-y-6">
+          <Card className="border-blue-500/20 bg-blue-500/5 overflow-hidden">
+            <CardHeader className="bg-blue-500/10">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-blue-400">
+                🚀 Redéploiement
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Redéployez votre site sur le serveur si les fichiers ont été supprimés ou si le déploiement initial a échoué.
+              </p>
+              <Button 
+                variant="outline" 
+                className="w-full border-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white transition-all font-bold text-xs"
+                onClick={handleRedeploy}
+                disabled={isRedeploying}
+              >
+                {isRedeploying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Redéployer le site
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="border-destructive/20 bg-destructive/5 overflow-hidden">
             <CardHeader className="bg-destructive/10">
               <CardTitle className="text-sm font-bold uppercase tracking-widest text-destructive flex items-center gap-2">

@@ -16,6 +16,79 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
+// Fonction pour lire les fichiers depuis le VPS via SSH
+const readProjectFilesViaSSH = async (projectPath: string, maxFiles: number = 50): Promise<FileContent[]> => {
+  try {
+    const SSH = require('node-ssh').NodeSSH;
+    const ssh = new SSH();
+
+    console.log(`🔗 Connexion SSH au VPS...`);
+    await ssh.connect({
+      host: process.env.DEPLOY_SSH_HOST,
+      username: process.env.DEPLOY_SSH_USER,
+      password: process.env.DEPLOY_SSH_PASSWORD,
+    });
+    console.log(`✅ SSH connecté à ${process.env.DEPLOY_SSH_HOST}`);
+
+    const files: FileContent[] = [];
+    
+    // Vérifier que le répertoire existe
+    const testCmd = `[ -d "${projectPath}" ] && echo "EXISTS" || echo "NOT_FOUND"`;
+    const testResult = await ssh.execCommand(testCmd);
+    console.log(`   Test répertoire ${projectPath}:`, testResult.stdout.trim());
+    
+    if (!testResult.stdout.includes('EXISTS')) {
+      console.warn(`❌ Répertoire n'existe pas: ${projectPath}`);
+      ssh.dispose();
+      return [];
+    }
+    
+    // Lire les fichiers de manière récursive via SSH
+    const findCmd = `find ${projectPath} -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.next/*' | head -${maxFiles}`;
+    console.log(`   Exécution find...`);
+    const findResult = await ssh.execCommand(findCmd);
+    
+    if (findResult.code !== 0) {
+      console.warn(`❌ SSH find failed (code ${findResult.code}): ${findResult.stderr}`);
+      ssh.dispose();
+      return [];
+    }
+
+    const fileList = findResult.stdout.split('\n').filter(Boolean);
+    console.log(`   ✅ Fichiers trouvés: ${fileList.length}`);
+    
+    for (const filePath of fileList) {
+      if (files.length >= maxFiles) break;
+      
+      // Lire le contenu du fichier
+      const readCmd = `cat "${filePath}"`;
+      const readResult = await ssh.execCommand(readCmd);
+      
+      if (readResult.code === 0) {
+        const content = readResult.stdout;
+        
+        // Limiter la taille du contenu (max 100KB par fichier)
+        if (content.length <= 102400) {
+          const relativePath = filePath.replace(projectPath + '/', '');
+          files.push({
+            name: path.basename(filePath),
+            path: relativePath,
+            language: getLanguageFromExtension(filePath),
+            content: content
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ ${files.length} fichiers lus via SSH`);
+    ssh.dispose();
+    return files;
+  } catch (error: any) {
+    console.error('❌ Erreur SSH:', error.message || String(error));
+    return [];
+  }
+};
+
 interface FileContent {
   name: string;
   content: string;
@@ -130,42 +203,63 @@ export async function GET(request: NextRequest) {
     const projectName = projectData?.siteName || projectData?.name || 'Mon Projet';
     const domain = projectData?.domain || '';
     
-    // Construire le chemin du projet: /var/www/{domain-formatted}
+    console.log(`📂 Récupération fichiers pour ${projectId}:`);
+    console.log(`   Projet: ${projectName}`);
+    console.log(`   Domaine utilisé: ${domain || '(vide)'}`);
+    
+    // Construire le chemin du projet: /var/www/{domain}
+    // Utiliser le domaine directement (le symlink est créé avec le domaine exact)
     let projectPath = '';
     
     if (domain) {
-      const siteName = domain.replace(/\./g, '-');
-      projectPath = `/var/www/${siteName}`;
+      projectPath = `/var/www/${domain}`;
     } else {
       // Fallback: utiliser le nom du projet formaté
       const siteName = projectName.toLowerCase().replace(/\s+/g, '-');
       projectPath = `/var/www/${siteName}`;
     }
+    
+    console.log(`   Chemin: ${projectPath}`);
 
-    // Vérifier que le dossier existe
+    // Vérifier que le dossier existe localement ou sur le VPS
+    let files: FileContent[] = [];
+    
     try {
       await fs.access(projectPath);
-    } catch {
-      // Si le dossier n'existe pas en production, retourner des fichiers par défaut
-      console.warn(`Project directory not found: ${projectPath}`);
+      // Lire localement si le chemin existe
+      files = await readProjectFiles(projectPath);
+      console.log(`✅ Fichiers lus localement depuis ${projectPath}`);
+    } catch (err: any) {
+      // Si le dossier n'existe pas localement, essayer via SSH (déploiement sur VPS)
+      console.warn(`⚠️ Dossier inexistant localement: ${projectPath}`);
+      console.warn(`   Erreur locale:`, err.code);
+      console.warn(`   → Tentative lecture via SSH...`);
       
-      return NextResponse.json({
-        files: [
-          {
-            name: 'README.md',
-            path: 'README.md',
-            language: 'markdown',
-            content: `# ${projectName}\n\nCe projet n'a pas encore été déployé sur le serveur.\n\nDéployez-le via la section "Déploiements" du dashboard.`
-          }
-        ],
-        total: 1,
-        project: { id: projectId, name: projectName },
-        source: 'default'
-      });
+      // Essayer de lire via SSH depuis le VPS
+      const sshPath = projectPath.startsWith('/var/www/') ? projectPath : `/var/www/${domain || projectName}`;
+      console.log(`   Chemin SSH: ${sshPath}`);
+      files = await readProjectFilesViaSSH(sshPath);
+      
+      if (files.length === 0) {
+        // Si SSH aussi échoue, retourner le message par défaut
+        console.warn(`❌ Aucun fichier lus via SSH: ${sshPath}`);
+        return NextResponse.json({
+          files: [
+            {
+              name: 'README.md',
+              path: 'README.md',
+              language: 'markdown',
+              content: `# ${projectName}\n\nLe projet n'a pas été trouvé localement ni sur le serveur VPS.\n\nVérifiez que le déploiement s'est bien déroulé.`
+            }
+          ],
+          total: 1,
+          project: { id: projectId, name: projectName },
+          source: 'error'
+        });
+      }
+      
+      console.log(`✅ ${files.length} fichiers lus via SSH`);
     }
-
-    // Lire les vrais fichiers du projet
-    const files = await readProjectFiles(projectPath);
 
     // Ajouter un README si le projet est vide
     if (files.length === 0) {

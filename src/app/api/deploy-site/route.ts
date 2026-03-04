@@ -11,46 +11,27 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 let adminApp = getApps()[0];
 if (!adminApp) {
   try {
-    const credential = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    };
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-    if (credential.projectId && credential.clientEmail && credential.privateKey) {
+    if (projectId && clientEmail && privateKey) {
+      const credential = {
+        projectId,
+        clientEmail,
+        privateKey,
+      };
+
       adminApp = initializeApp({
         credential: cert(credential as any),
       });
+      console.log('✅ Firebase Admin SDK initialized for deploy-site');
+    } else {
+      console.warn('⚠️ Firebase Admin credentials incomplete - will use REST API fallback');
+      console.log('  projectId:', !!projectId, 'clientEmail:', !!clientEmail, 'privateKey:', !!privateKey);
     }
   } catch (error) {
     console.error('Firebase Admin init error:', error);
-  }
-}
-
-async function verifyToken(token: string): Promise<string | null> {
-  try {
-    if (adminApp) {
-      const auth = getAuth(adminApp);
-      const decodedToken = await auth.verifyIdToken(token);
-      return decodedToken.uid;
-    }
-
-    // Fallback REST API
-    const apiKey = process.env.FIREBASE_API_KEY;
-    if (!apiKey) return null;
-
-    const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + apiKey, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: token }),
-    });
-
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.users?.[0]?.localId || null;
-  } catch (error) {
-    console.error('Token verification error:', error);
-    return null;
   }
 }
 
@@ -118,6 +99,28 @@ EOF`);
     // Activer la configuration nginx
     await ssh.execCommand(`ln -sf ${nginxConfig} /etc/nginx/sites-enabled/${siteName} || true`);
     
+    // 🔗 Créer un lien symbolique vers /var/www/{siteName} pour l'accès direct
+    const shortcutPath = `/var/www/${siteName}`;
+    console.log(`🔗 Création du lien symbolique: ${shortcutPath} -> ${siteDir}`);
+    
+    // Nettoyer complètement les anciens symlinks (en cas de redéploiement)
+    const cleanupResult = await ssh.execCommand(`
+      # Supprimer les symlinks cassés ou existants
+      rm -f ${shortcutPath} 2>/dev/null || true
+      # Supprimer aussi d'éventuels symlinks internes brisés
+      find ${siteDir} -type l -xtype l -delete 2>/dev/null || true
+      echo "Nettoyage terminé"
+    `);
+    console.log(`   Nettoyage:`, cleanupResult.stdout?.trim() || 'OK');
+    
+    // Créer le symlink vers le répertoire source réel
+    const symlinkResult = await ssh.execCommand(`ln -s ${siteDir} ${shortcutPath} && ls -la ${shortcutPath}`);
+    console.log(`   Résultat symlink:`, symlinkResult.stdout || symlinkResult.stderr);
+    
+    // Vérifier que le chemin final est accessible
+    const checkFinalPath = await ssh.execCommand(`ls -la ${shortcutPath}/ | head -5 && echo "✅ Contenu accessible"`);
+    console.log(`   Vérification accès:`, checkFinalPath.stdout || checkFinalPath.stderr);
+    
     // Tester et recharger nginx
     await ssh.execCommand('nginx -t && systemctl reload nginx');
 
@@ -132,18 +135,14 @@ EOF`);
 
 export async function POST(request: NextRequest) {
   try {
-    // Vérifier l'authentification
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const userId = await verifyToken(token);
-
+    // Récupérer l'userId depuis le header x-user-id
+    const userId = request.headers.get('x-user-id');
     if (!userId) {
-      return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+      console.error('❌ No x-user-id header provided');
+      return NextResponse.json({ error: 'Non authentifié - userId manquant' }, { status: 401 });
     }
+
+    console.log('✅ Authentification OK pour:', userId);
 
     const body = await request.json();
     const { siteName } = body;

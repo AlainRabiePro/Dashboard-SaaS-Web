@@ -10,16 +10,24 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 let adminApp = getApps()[0];
 if (!adminApp) {
   try {
-    const credential = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    };
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-    if (credential.projectId && credential.clientEmail && credential.privateKey) {
+    if (projectId && clientEmail && privateKey) {
+      const credential = {
+        projectId,
+        clientEmail,
+        privateKey,
+      };
+
       adminApp = initializeApp({
         credential: cert(credential as any),
       });
+      console.log('✅ Firebase Admin SDK initialized');
+    } else {
+      console.warn('⚠️ Firebase Admin credentials incomplete - will use REST API fallback');
+      console.log('  projectId:', !!projectId, 'clientEmail:', !!clientEmail, 'privateKey:', !!privateKey);
     }
   } catch (error) {
     console.error('Firebase Admin init error:', error);
@@ -29,14 +37,24 @@ if (!adminApp) {
 async function verifyToken(token: string): Promise<string | null> {
   try {
     if (adminApp) {
-      const auth = getAuth(adminApp);
-      const decodedToken = await auth.verifyIdToken(token);
-      return decodedToken.uid;
+      try {
+        const auth = getAuth(adminApp);
+        const decodedToken = await auth.verifyIdToken(token);
+        console.log('✅ Token verified with Admin SDK:', decodedToken.uid);
+        return decodedToken.uid;
+      } catch (adminError) {
+        console.warn('⚠️ Admin SDK verification failed, trying REST API:', adminError);
+      }
+    } else {
+      console.warn('⚠️ Admin app not initialized, using REST API');
     }
 
     // Fallback REST API
-    const apiKey = process.env.FIREBASE_API_KEY;
-    if (!apiKey) return null;
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (!apiKey) {
+      console.error('❌ FIREBASE_API_KEY not configured');
+      return null;
+    }
 
     const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + apiKey, {
       method: 'POST',
@@ -44,11 +62,22 @@ async function verifyToken(token: string): Promise<string | null> {
       body: JSON.stringify({ idToken: token }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ REST API lookup failed:', response.status, errorText);
+      return null;
+    }
+    
     const data = await response.json();
-    return data.users?.[0]?.localId || null;
+    const userId = data.users?.[0]?.localId;
+    if (userId) {
+      console.log('✅ Token verified with REST API:', userId);
+    } else {
+      console.error('❌ No userId found in REST API response');
+    }
+    return userId || null;
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('❌ Token verification error:', error);
     return null;
   }
 }
@@ -159,33 +188,48 @@ async function deleteSiteFromFirestore(userId: string, siteId: string): Promise<
         console.log(`✅ Site ${siteId} supprimé de Firestore avec Admin`);
         return true;
       } catch (adminError) {
-        console.warn(`Admin deletion failed, trying REST API:`, adminError);
+        console.warn(`⚠️ Admin deletion failed:`, adminError);
       }
     }
 
     // Fallback: Utiliser l'API REST de Firestore
-    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
     if (!projectId) {
-      console.warn('FIREBASE_PROJECT_ID not configured');
+      console.error('❌ FIREBASE_PROJECT_ID not configured - impossible de supprimer de Firestore');
       return false;
     }
 
+    // Pour l'API REST Firestore sans authentification admin, on doit utiliser la collection path
+    // https://firebase.google.com/docs/firestore/manage-data/delete-data#rest
     const deleteUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}/sites/${siteId}`;
     
-    console.log(`Suppression via REST API: ${deleteUrl}`);
+    console.log(`🔗 Suppression via REST API Firestore (sans authentification - accès public)`);
     const response = await fetch(deleteUrl, {
       method: 'DELETE',
     });
 
+    if (response.status === 404) {
+      console.warn(`⚠️ Site ${siteId} non trouvé dans Firestore (déjà supprimé ?)`);
+      return true;
+    }
+
+    if (response.status === 403) {
+      console.warn(`⚠️ Firestore requiert une authentification - le site reste dans Firestore`);
+      console.log(`   💡 Solution: Configurer FIREBASE_CLIENT_EMAIL et FIREBASE_PRIVATE_KEY pour l'Admin SDK`);
+      return false; // Échec mais pas critique
+    }
+
     if (!response.ok) {
-      console.error(`REST API delete failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`❌ Erreur Firestore REST API: ${response.status} ${response.statusText}`);
+      console.error(`   Détails: ${errorText}`);
       return false;
     }
 
     console.log(`✅ Site ${siteId} supprimé de Firestore via REST API`);
     return true;
   } catch (error) {
-    console.error('Erreur lors de la suppression du site de Firestore:', error);
+    console.error('❌ Erreur lors de la suppression du site de Firestore:', error);
     return false;
   }
 }
@@ -195,15 +239,20 @@ export async function POST(request: NextRequest) {
     // Vérifier l'authentification
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+      console.error('❌ No authorization header or invalid format');
+      return NextResponse.json({ error: 'Non authentifié - header manquant' }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
+    console.log('🔐 Vérification du token...');
     const userId = await verifyToken(token);
 
     if (!userId) {
-      return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+      console.error('❌ Token verification failed');
+      return NextResponse.json({ error: 'Token invalide - authentification échouée' }, { status: 401 });
     }
+
+    console.log('✅ Authentification OK pour:', userId);
 
     const body = await request.json();
     const { siteName, siteId } = body;
@@ -218,22 +267,36 @@ export async function POST(request: NextRequest) {
     console.log('Step 1: Suppression du VPS...');
     const vpsDeleted = await deleteSiteFromVPS(userId, siteName);
     if (!vpsDeleted) {
-      console.warn(`⚠️ Erreur lors de la suppression du VPS, mais on continue...`);
+      console.warn(`⚠️ La suppression du VPS a échoué, mais on continue avec Firestore...`);
     }
 
     // 2. Supprimer de Firestore
     console.log('Step 2: Suppression de Firestore...');
     const firestoreDeleted = await deleteSiteFromFirestore(userId, siteId);
 
-    console.log(`✅ Suppression complète: VPS=${vpsDeleted}, Firestore=${firestoreDeleted}`);
+    // Résultat final
+    const success = vpsDeleted && firestoreDeleted;
+    const status = success ? 200 : 206; // 206 = Partial Content (suppression partielle)
+    
+    const message = success 
+      ? `✅ Site ${siteName} entièrement supprimé (VPS + Firestore)`
+      : vpsDeleted && !firestoreDeleted
+        ? `⚠️ Site ${siteName} supprimé du VPS, mais reste dans Firestore`
+        : `⚠️ Erreur lors de la suppression du VPS - Firestore non modifié`;
 
-    return NextResponse.json({
-      success: true,
-      message: `Site ${siteName} supprimé avec succès`,
-      siteName,
-      vpsDeleted,
-      firestoreDeleted,
-    });
+    console.log(`\n${message}`);
+    console.log(`Suppression complète: VPS=${vpsDeleted}, Firestore=${firestoreDeleted}`);
+
+    return NextResponse.json(
+      {
+        success,
+        message,
+        siteName,
+        vpsDeleted,
+        firestoreDeleted,
+      },
+      { status }
+    );
   } catch (error: any) {
     console.error('❌ Erreur lors de la suppression:', error);
     return NextResponse.json(

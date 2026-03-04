@@ -30,6 +30,7 @@ export interface Site {
   id: string;
   name: string;
   url: string;
+  domain?: string; // Le domaine du site (ex: instacraft.fr)
   status: 'active' | 'suspended';
   createdAt: any;
   storageUsed: number;
@@ -77,6 +78,7 @@ export function addSite(uid: string, name: string, url: string, repositoryUrl?: 
   const data = {
     name,
     url,
+    domain: domain || '', // Sauvegarder le domaine
     repositoryUrl: repositoryUrl || '',
     status: 'active' as const,
     createdAt: Timestamp.now(),
