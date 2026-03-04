@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 
 const firebaseConfig = {
@@ -29,30 +29,17 @@ export async function GET(request: NextRequest) {
     
     let sites = sitesSnap.docs.map(doc => {
       const data = doc.data();
-      // Auto-initialiser si pas de données de monitoring
-      if (!data.uptime && !data.latency && !data.errorRate) {
-        const defaultData = {
-          uptime: 99.8 + Math.random() * 0.2,
-          latency: Math.floor(45 + Math.random() * 55),
-          errorRate: Math.random() * 0.5,
-          status: 'healthy',
-          domain: data.domain || `site-${doc.id.substring(0, 8)}.example.com`,
-        };
-        // Sauvegarder les données par défaut
-        setDoc(doc.ref, defaultData, { merge: true }).catch(err => console.error('Error saving default monitoring data:', err));
-        return {
-          id: doc.id,
-          name: data.domain || `site-${doc.id.substring(0, 8)}.example.com`,
-          ...defaultData,
-        };
-      }
+      const metrics = data.metrics || {};
+      
       return {
         id: doc.id,
-        name: data.domain || data.name || `site-${doc.id.substring(0, 8)}.example.com`,
-        uptime: data.uptime || 0,
-        latency: data.latency || 0,
-        errorRate: data.errorRate || 0,
-        status: data.status || 'unknown',
+        name: data.name || data.domain || `site-${doc.id.substring(0, 8)}.example.com`,
+        domain: data.domain,
+        uptime: metrics.uptime ?? 0,
+        latency: metrics.latency ?? 0,
+        errorRate: metrics.errorRate ?? 0,
+        status: metrics.status || 'unknown',
+        lastCheck: metrics.lastCheck || null,
       };
     });
 
@@ -69,6 +56,10 @@ export async function GET(request: NextRequest) {
       ? Math.floor(sites.reduce((sum, s) => sum + s.latency, 0) / sites.length)
       : 0;
 
+    const avgErrorRate = sites.length > 0
+      ? (sites.reduce((sum, s) => sum + s.errorRate, 0) / sites.length).toFixed(2)
+      : 0;
+
     const alertCount = sites.filter(s => s.status === 'critical' || s.status === 'warning').length;
 
     return NextResponse.json({ 
@@ -76,7 +67,7 @@ export async function GET(request: NextRequest) {
       summary: {
         uptime: parseFloat(totalUptime as string),
         latency: avgLatency,
-        errorRate: sites.length > 0 ? (sites.reduce((sum, s) => sum + s.errorRate, 0) / sites.length) : 0,
+        errorRate: parseFloat(avgErrorRate as string),
         alerts: alertCount,
       }
     });

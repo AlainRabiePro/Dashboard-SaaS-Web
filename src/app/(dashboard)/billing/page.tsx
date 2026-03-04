@@ -3,28 +3,25 @@
 
 import { useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useFirestore, useDoc, useCollection } from "@/firebase";
-import { doc, collection, query, orderBy } from "firebase/firestore";
+import { useFirestore, useDoc } from "@/firebase";
+import { doc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserProfile, Invoice } from "@/lib/firestore-service";
-import { format } from "date-fns";
+import { useInvoices } from "@/hooks/use-invoices";
+import { formatInvoiceAmount, formatInvoiceDate } from "@/lib/invoice-service";
+import { UserProfile } from "@/lib/firestore-service";
 import { FileDown, CreditCard, Loader2, Calendar, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export default function BillingPage() {
   const { user } = useAuth();
   const firestore = useFirestore();
+  const { invoices, loading, error } = useInvoices();
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
-  const invoicesQuery = useMemo(() => 
-    user ? query(collection(firestore, "users", user.uid, "invoices"), orderBy("date", "desc")) : null
-  , [firestore, user]);
-
   const { data: profile } = useDoc<UserProfile>(profileRef);
-  const { data: invoices, loading } = useCollection<Invoice>(invoicesQuery);
 
   const getPlanPrice = (plan: string | undefined) => {
     switch (plan) {
@@ -33,6 +30,14 @@ export default function BillingPage() {
       case 'Enterprise': return '$16.99';
       default: return '$9.99';
     }
+  };
+
+  const handleDownloadPDF = (invoiceNumber: string) => {
+    // Implémentation pour télécharger le PDF
+    const link = document.createElement('a');
+    link.href = `/api/invoices/${invoiceNumber}/pdf`;
+    link.download = `${invoiceNumber}.pdf`;
+    link.click();
   };
 
   return (
@@ -68,27 +73,42 @@ export default function BillingPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : (
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-48 text-center text-destructive">
+                      Erreur lors du chargement des factures.
+                    </TableCell>
+                  </TableRow>
+                ) : invoices && invoices.length > 0 ? (
                   invoices.map((inv) => (
                     <TableRow key={inv.id} className="border-white/5 hover:bg-white/5">
                       <TableCell className="text-sm">
-                        {inv.date ? format(inv.date.toDate(), "MMMM dd, yyyy") : "..."}
+                        {formatInvoiceDate(inv.issueDate)}
                       </TableCell>
-                      <TableCell className="font-semibold text-sm">${inv.amount?.toFixed(2)}</TableCell>
+                      <TableCell className="font-semibold text-sm">
+                        {formatInvoiceAmount(inv.total)}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={inv.status === 'paid' ? 'default' : 'secondary'} className="text-[10px] uppercase font-bold">
-                          {inv.status}
+                        <Badge 
+                          variant={inv.status === 'paid' ? 'default' : inv.status === 'overdue' ? 'destructive' : 'secondary'} 
+                          className="text-[10px] uppercase font-bold"
+                        >
+                          {inv.status === 'paid' ? 'Payée' : inv.status === 'pending' ? 'En attente' : inv.status === 'overdue' ? 'En retard' : inv.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="hover:bg-white/10 h-8">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="hover:bg-white/10 h-8"
+                          onClick={() => handleDownloadPDF(inv.invoiceNumber)}
+                        >
                           <FileDown className="mr-2 h-4 w-4" /> PDF
                         </Button>
                       </TableCell>
                     </TableRow>
                   ))
-                )}
-                {!loading && invoices.length === 0 && (
+                ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="h-48 text-center text-muted-foreground">
                       Aucune facture trouvée.

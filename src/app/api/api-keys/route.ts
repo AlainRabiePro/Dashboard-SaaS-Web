@@ -15,6 +15,34 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
+/**
+ * Enregistre une action dans l'audit log
+ */
+async function logAuditAction(
+  userId: string,
+  action: string,
+  description: string,
+  resourceId?: string,
+  request?: NextRequest
+) {
+  try {
+    const auditRef = collection(db, 'users', userId, 'audit_logs');
+    await addDoc(auditRef, {
+      action,
+      title: description,
+      description,
+      timestamp: Date.now(),
+      resourceId,
+      resourceType: 'api-key',
+      ip: request?.headers?.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+      userAgent: request?.headers?.get('user-agent') || 'unknown',
+    });
+  } catch (error) {
+    console.error('⚠️ Erreur lors de la création du log audit:', error);
+    // Ne pas bloquer l'opération si l'audit log échoue
+  }
+}
+
 async function initializeApiKeys(userId: string) {
   const keysRef = collection(db, 'users', userId, 'apiKeys');
   const defaultKey = 'sk_' + randomBytes(16).toString('hex');
@@ -92,6 +120,15 @@ export async function POST(request: NextRequest) {
       active: true,
     });
 
+    // 🎯 Enregistrer l'action dans l'audit log
+    await logAuditAction(
+      userId,
+      'API_KEY_CREATE',
+      `Création d'une clé API: ${name}`,
+      docRef.id,
+      request
+    );
+
     return NextResponse.json({ 
       success: true, 
       id: docRef.id, 
@@ -120,6 +157,15 @@ export async function DELETE(request: NextRequest) {
 
     const keyRef = doc(db, 'users', userId, 'apiKeys', keyId);
     await deleteDoc(keyRef);
+
+    // 🎯 Enregistrer l'action dans l'audit log
+    await logAuditAction(
+      userId,
+      'API_KEY_DELETE',
+      `Suppression d'une clé API`,
+      keyId,
+      request
+    );
 
     return NextResponse.json({ success: true, message: 'API key deleted' });
   } catch (error: any) {

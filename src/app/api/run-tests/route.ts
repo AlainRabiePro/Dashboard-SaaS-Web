@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { initializeApp, getApps } from 'firebase/app';
 
 interface TestRunRequest {
   siteId: string;
@@ -21,117 +19,122 @@ interface TestResult {
   deploymentId?: string;
 }
 
-// Initialiser Firebase
-const apps = getApps();
-const app = apps.length > 0 ? apps[0] : initializeApp({
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-});
-
-const db = getFirestore(app);
-
-// Exécuter les tests en local
-async function runLocalTests(suiteId: string): Promise<TestResult> {
+// Exécuter les tests via SSH
+async function runTestsViaSSH(siteId: string, suiteId: string): Promise<TestResult> {
   try {
-    // Simuler l'exécution des tests
-    // En production, vous appelleriez npm test ou un autre script
-    let passed = 0;
-    let failed = 0;
-    let total = 0;
+    // Map suite IDs to test commands
+    const testCommands: Record<string, string> = {
+      'unit-tests': 'npm test -- --json --passWithNoTests 2>&1',
+      'integration-tests': 'npm run test:integration -- --json --passWithNoTests 2>&1 || true',
+      'e2e-tests': 'npm run test:e2e -- --json --passWithNoTests 2>&1 || true',
+    };
 
-    switch (suiteId) {
-      case 'unit-tests':
-        total = 145;
-        failed = Math.floor(Math.random() * 5) === 0 ? 3 : 0; // 20% chance d'échec
-        passed = total - failed;
-        break;
-      case 'integration-tests':
-        total = 58;
-        failed = Math.floor(Math.random() * 8) === 0 ? 2 : 0; // 12.5% chance d'échec
-        passed = total - failed;
-        break;
-      case 'e2e-tests':
-        total = 32;
-        failed = Math.floor(Math.random() * 10) === 0 ? 1 : 0; // 10% chance d'échec
-        passed = total - failed;
-        break;
-      default:
-        total = 100;
-        failed = 0;
-        passed = total;
+    const command = testCommands[suiteId];
+    if (!command) {
+      throw new Error('Unknown test suite');
     }
 
-    const duration = Math.floor(Math.random() * 10000) + 1000; // 1-11 secondes
+    // Execute via the console execute API
+    const response = await fetch(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000' + '/api/console/execute', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        command,
+        projectName: siteId,
+        projectPath: siteId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to execute tests');
+    }
+
+    const result = await response.json();
+    const output = result.output || '';
+
+    // Parse test results
+    let stats = {
+      passed: 0,
+      failed: 0,
+      total: 0,
+      duration: 0,
+    };
+
+    try {
+      // Try to parse JSON output from Jest
+      const jsonMatch = output.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.numPassedTests !== undefined) {
+          stats.passed = parsed.numPassedTests || 0;
+          stats.failed = parsed.numFailedTests || 0;
+          stats.total = (parsed.numPassedTests || 0) + (parsed.numFailedTests || 0);
+          stats.duration = Math.round((parsed.testResults?.[0]?.perfStats?.end - parsed.testResults?.[0]?.perfStats?.start) || 0);
+        }
+      }
+    } catch (e) {
+      console.log('Could not parse JSON test results');
+    }
+
+    // Fallback: Parse text output
+    if (stats.total === 0) {
+      const passMatch = output.match(/(\d+)\s+passed/i);
+      const failMatch = output.match(/(\d+)\s+failed/i);
+      const durationMatch = output.match(/(\d+(?:\.\d+)?)\s*s/i);
+
+      stats.passed = passMatch ? parseInt(passMatch[1]) : 0;
+      stats.failed = failMatch ? parseInt(failMatch[1]) : 0;
+      stats.total = stats.passed + stats.failed || 1;
+      stats.duration = durationMatch ? Math.round(parseFloat(durationMatch[1]) * 1000) : 0;
+    }
+
+    // Get commit hash if available
+    let commitHash = '';
+    const commitResponse = await fetch(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000' + '/api/console/execute', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        command: 'git rev-parse --short HEAD 2>&1',
+        projectName: siteId,
+        projectPath: siteId,
+      }),
+    });
+
+    if (commitResponse.ok) {
+      const commitResult = await commitResponse.json();
+      commitHash = (commitResult.output || '').trim();
+    }
 
     return {
-      id: `run-${Date.now()}`,
+      id: `test-${Date.now()}`,
       suiteId,
-      status: failed > 0 ? 'failed' : 'passed',
-      passed,
-      failed,
-      total,
-      duration,
+      status: stats.failed === 0 && stats.total > 0 ? 'passed' : stats.total > 0 ? 'failed' : 'passed',
+      passed: stats.passed,
+      failed: stats.failed,
+      total: Math.max(stats.total, 1),
+      duration: stats.duration,
       date: new Date().toLocaleString('fr-FR'),
-      commitHash: Math.random().toString(36).substring(7),
+      commitHash: commitHash || undefined,
     };
+
   } catch (error) {
-    console.error('Error running tests:', error);
-    throw new Error('Failed to run tests');
-  }
-}
-
-// Exécuter les tests via npm
-async function runNpmTests(suiteId: string): Promise<TestResult> {
-  try {
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-
-    let command = '';
-    switch (suiteId) {
-      case 'unit-tests':
-        command = 'npm run test:unit -- --coverage';
-        break;
-      case 'integration-tests':
-        command = 'npm run test:integration -- --coverage';
-        break;
-      case 'e2e-tests':
-        command = 'npm run test:e2e -- --headless';
-        break;
-      default:
-        command = 'npm test';
-    }
-
-    const startTime = Date.now();
-    const { stdout, stderr } = await execAsync(command, { timeout: 600000 }); // 10 min timeout
-    const duration = Date.now() - startTime;
-
-    // Parser les résultats (simplifié - adapter selon votre format)
-    const passedMatch = stdout.match(/(\d+) passed/);
-    const failedMatch = stdout.match(/(\d+) failed/);
+    console.error('[RUN-TESTS] SSH Error:', error);
     
-    const passed = passedMatch ? parseInt(passedMatch[1]) : 0;
-    const failed = failedMatch ? parseInt(failedMatch[1]) : 0;
-    const total = passed + failed;
-
+    // Fallback: Return error result
     return {
-      id: `run-${Date.now()}`,
+      id: `test-${Date.now()}`,
       suiteId,
-      status: failed > 0 ? 'failed' : 'passed',
-      passed,
-      failed,
-      total,
-      duration,
+      status: 'failed',
+      passed: 0,
+      failed: 1,
+      total: 1,
+      duration: 0,
       date: new Date().toLocaleString('fr-FR'),
-      commitHash: (await execAsync('git rev-parse --short HEAD')).stdout.trim(),
     };
-  } catch (error) {
-    console.error('Error running npm tests:', error);
-    throw new Error('Failed to run npm tests');
   }
 }
 
@@ -147,33 +150,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Récupérer le site depuis Firestore
-    const siteRef = doc(db, 'users', userId, 'sites', siteId);
-    const siteSnap = await getDoc(siteRef);
-
-    if (!siteSnap.exists()) {
-      return NextResponse.json(
-        { error: 'Site not found' },
-        { status: 404 }
-      );
-    }
-
-    // Exécuter les tests
-    const testResult = await runLocalTests(suiteId);
-    // Alternative: await runNpmTests(suiteId);
-
-    // Sauvegarder le résultat en Firestore
-    const testRunsRef = doc(db, 'users', userId, 'sites', siteId, 'testRuns', testResult.id);
-    await updateDoc(siteRef, {
-      lastTestRun: testResult.date,
-      testRunsCount: (siteSnap.data().testRunsCount || 0) + 1,
-    });
+    // Exécuter les tests via SSH
+    const testResult = await runTestsViaSSH(siteId, suiteId);
 
     return NextResponse.json(testResult, { status: 200 });
   } catch (error) {
     console.error('Error in run-tests:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      {
+        id: `test-${Date.now()}`,
+        suiteId: 'unknown',
+        status: 'failed' as const,
+        passed: 0,
+        failed: 1,
+        total: 1,
+        duration: 0,
+        date: new Date().toLocaleString('fr-FR'),
+        error: error instanceof Error ? error.message : 'Internal server error',
+      },
       { status: 500 }
     );
   }

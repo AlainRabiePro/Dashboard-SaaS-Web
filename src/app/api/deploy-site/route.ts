@@ -126,6 +126,27 @@ EOF`);
 
     console.log(`✅ Site ${siteName} déployé sur le VPS`);
     ssh.dispose();
+    
+    // 🎯 Enregistrer l'action dans l'audit log
+    try {
+      const db = getFirestore(adminApp);
+      const auditRef = db.collection('users').doc(userId).collection('audit_logs');
+      await auditRef.add({
+        action: 'DEPLOY',
+        title: 'Déploiement de site',
+        description: `Déploiement du site: ${siteName}`,
+        timestamp: Date.now(),
+        resourceId: siteName,
+        resourceType: 'site',
+        ip: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+      });
+      console.log(`✅ Audit log créé pour le déploiement de ${siteName}`);
+    } catch (auditError) {
+      console.error('⚠️ Erreur lors de la création du log audit:', auditError);
+      // Ne pas bloquer le déploiement si l'audit log échoue
+    }
+    
     return true;
   } catch (error) {
     console.error('Erreur lors du déploiement sur le VPS:', error);

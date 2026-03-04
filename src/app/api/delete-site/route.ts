@@ -287,6 +287,28 @@ export async function POST(request: NextRequest) {
     console.log(`\n${message}`);
     console.log(`Suppression complète: VPS=${vpsDeleted}, Firestore=${firestoreDeleted}`);
 
+    // 🎯 Enregistrer l'action dans l'audit log
+    if (success) {
+      try {
+        const db = getFirestore(adminApp);
+        const auditRef = db.collection('users').doc(userId).collection('audit_logs');
+        await auditRef.add({
+          action: 'DELETE',
+          title: 'Suppression de site',
+          description: `Suppression du site: ${siteName}`,
+          timestamp: Date.now(),
+          resourceId: siteId,
+          resourceType: 'site',
+          ip: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown',
+        });
+        console.log(`✅ Audit log créé pour la suppression de ${siteName}`);
+      } catch (auditError) {
+        console.error('⚠️ Erreur lors de la création du log audit:', auditError);
+        // Ne pas bloquer la suppression si l'audit log échoue
+      }
+    }
+
     return NextResponse.json(
       {
         success,
