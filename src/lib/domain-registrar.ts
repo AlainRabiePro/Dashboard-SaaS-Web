@@ -202,6 +202,111 @@ export async function registerDomainGandi(
 }
 
 /**
+ * Enregistrement auprès de IONOS
+ * 
+ * @see https://api.ionos.com/domains
+ */
+export async function registerDomainIonos(
+  domain: string,
+  userId: string,
+  userEmail: string,
+  userName?: string
+): Promise<DomainRegistrationResult> {
+  try {
+    const apiKey = process.env.IONOS_API_KEY;
+    const apiSecret = process.env.IONOS_API_SECRET;
+
+    if (!apiKey || !apiSecret) {
+      throw new Error('IONOS API credentials missing');
+    }
+
+    // Obtenir le token d'accès
+    const authResponse = await fetch('https://api.hosting.ionos.fr/auth/authorize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: apiKey,
+        client_secret: apiSecret,
+      }),
+    });
+
+    if (!authResponse.ok) {
+      throw new Error('IONOS authentication failed');
+    }
+
+    const authData = await authResponse.json();
+    const accessToken = authData.access_token;
+
+    // Diviser le domaine en nom et TLD
+    const parts = domain.split('.');
+    const name = parts.slice(0, -1).join('.');
+    const tld = parts[parts.length - 1];
+
+    // Créer la commande de domaine
+    const orderResponse = await fetch('https://api.hosting.ionos.fr/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            domainName: domain,
+            quantity: 1,
+            duration: 12, // 1 an
+          },
+        ],
+        owner: {
+          firstName: userName?.split(' ')[0] || 'User',
+          lastName: userName?.split(' ')[1] || 'Account',
+          email: userEmail,
+          address: '123 Main St',
+          postalCode: '75001',
+          city: 'Paris',
+          countryCode: 'FR',
+        },
+        admin: {
+          firstName: userName?.split(' ')[0] || 'User',
+          lastName: userName?.split(' ')[1] || 'Account',
+          email: userEmail,
+          address: '123 Main St',
+          postalCode: '75001',
+          city: 'Paris',
+          countryCode: 'FR',
+        },
+      }),
+    });
+
+    const orderData = await orderResponse.json();
+
+    if (orderResponse.ok && orderData.orderId) {
+      return {
+        success: true,
+        registrarOrderId: orderData.orderId.toString(),
+        registrarName: 'IONOS',
+        registrarResponse: orderData,
+      };
+    }
+
+    return {
+      success: false,
+      error: orderData.message || 'IONOS registration failed',
+      registrarResponse: orderData,
+    };
+  } catch (error: any) {
+    console.error('IONOS registration error:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
  * Fonction générique pour enregistrer un domaine
  * Utilise le registrar configuré dans les variables d'environnement
  */
@@ -211,16 +316,19 @@ export async function registerDomain(
   userEmail: string,
   userName?: string
 ): Promise<DomainRegistrationResult> {
-  const registrar = process.env.DOMAIN_REGISTRAR || 'namecheap';
+  const registrar = process.env.DOMAIN_REGISTRAR || 'ionos';
 
   console.log(`📝 Registering domain ${domain} with ${registrar}`);
 
   switch (registrar.toLowerCase()) {
-    case 'namecheap':
-      return registerDomainNamecheap(domain, userId, userEmail, userName);
+    case 'ionos':
+      return registerDomainIonos(domain, userId, userEmail, userName);
 
     case 'gandi':
       return registerDomainGandi(domain, userId, userEmail);
+
+    case 'namecheap':
+      return registerDomainNamecheap(domain, userId, userEmail, userName);
 
     case 'mock':
       // Mode test - simule l'enregistrement
