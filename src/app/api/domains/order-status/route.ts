@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore, collection, doc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
+import { createLogger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limiter';
 
 /**
  * API pour gérer le statut des commandes de domaine
  * Permet de mettre à jour le statut après paiement Stripe
  */
+
+const logger = createLogger('domains/order-status');
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,6 +28,21 @@ export async function PATCH(request: NextRequest) {
     const userId = request.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const rateLimitKey = `order-status:${userId}`;
+    const rateLimit = checkRateLimit(rateLimitKey, {
+      windowMs: 60 * 1000,
+      maxRequests: 20,
+    });
+
+    if (!rateLimit.allowed) {
+      logger.warn(`Rate limit exceeded for user ${userId} (PATCH)`);
+      return NextResponse.json(
+        { error: 'Trop de requêtes. Réessayez plus tard.' },
+        { status: 429 }
+      );
     }
 
     const body = await request.json();
@@ -76,7 +95,7 @@ export async function PATCH(request: NextRequest) {
 
     await updateDoc(orderRef, updateData);
 
-    console.log(`✅ Commande ${orderId} mise à jour: ${status}`);
+    logger.info(`Order ${orderId} updated to ${status}`);
 
     return NextResponse.json({
       success: true,
@@ -85,7 +104,7 @@ export async function PATCH(request: NextRequest) {
       message: `Commande marquée comme ${status === 'paid' ? 'payée' : status}`,
     });
   } catch (error: any) {
-    console.error('Erreur:', error);
+    logger.error('Order status update error', { error: error.message });
     return NextResponse.json(
       { error: error.message || 'Erreur lors de la mise à jour' },
       { status: 500 }
@@ -99,6 +118,20 @@ export async function GET(request: NextRequest) {
     const userId = request.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const rateLimitKey = `order-status-get:${userId}`;
+    const rateLimit = checkRateLimit(rateLimitKey, {
+      windowMs: 60 * 1000,
+      maxRequests: 30,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Trop de requêtes. Réessayez plus tard.' },
+        { status: 429 }
+      );
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -130,9 +163,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    logger.info(`Order ${orderId} retrieved`);
     return NextResponse.json(orderDataGet);
   } catch (error: any) {
-    console.error('Erreur:', error);
+    logger.error('Order fetch error', { error: error.message });
     return NextResponse.json(
       { error: error.message || 'Erreur lors de la récupération' },
       { status: 500 }
@@ -146,6 +180,20 @@ export async function DELETE(request: NextRequest) {
     const userId = request.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const rateLimitKey = `order-delete:${userId}`;
+    const rateLimit = checkRateLimit(rateLimitKey, {
+      windowMs: 60 * 1000,
+      maxRequests: 10,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Trop de requêtes. Réessayez plus tard.' },
+        { status: 429 }
+      );
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -191,7 +239,7 @@ export async function DELETE(request: NextRequest) {
       cancelledAt: new Date() 
     });
 
-    console.log(`✅ Commande ${orderId} annulée`);
+    logger.info(`Order ${orderId} cancelled`);
 
     return NextResponse.json({
       success: true,
@@ -199,7 +247,7 @@ export async function DELETE(request: NextRequest) {
       message: 'Commande annulée',
     });
   } catch (error: any) {
-    console.error('Erreur:', error);
+    logger.error('Order cancellation error', { error: error.message });
     return NextResponse.json(
       { error: error.message || 'Erreur lors de l\'annulation' },
       { status: 500 }

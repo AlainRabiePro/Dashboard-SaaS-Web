@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { registerDomain } from '@/lib/domain-registrar';
+import { createLogger } from '@/lib/logger';
 
 /**
  * Webhook Stripe pour les événements de paiement de domaines
@@ -12,6 +13,8 @@ import { registerDomain } from '@/lib/domain-registrar';
  * 2. Add endpoint: https://yoursite.com/api/webhooks/domains
  * 3. Sélectionner les événements: checkout.session.completed
  */
+
+const logger = createLogger('webhooks/domains');
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.error('❌ STRIPE_WEBHOOK_SECRET non configuré');
+    logger.error('STRIPE_WEBHOOK_SECRET not configured');
     return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
   }
 
@@ -47,7 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
-    console.error('❌ Erreur de signature webhook:', err.message);
+    logger.error('Webhook signature verification failed', { error: err.message });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
           const userId = session.metadata.userId;
           const domain = session.metadata.domain;
 
-          console.log(`✅ Paiement reçu pour domaine ${domain} (${session.id})`);
+          logger.info(`Payment received for domain ${domain}`, { sessionId: session.id });
 
           // Mettre à jour la commande avec l'ID de session Stripe
           const orderRef = doc(db, 'domain_orders', orderId);
@@ -85,7 +88,9 @@ export async function POST(request: NextRequest) {
               updatedAt: new Date(),
             });
 
-            console.log(`✅ Domaine ${domain} enregistré avec succès via ${registerResult.registrarName}`);
+            logger.info(`Domain ${domain} registered successfully via ${registerResult.registrarName}`, {
+              registrarOrderId: registerResult.registrarOrderId,
+            });
           } else {
             // Paiement reçu mais enregistrement échoué - marquer en attente d'enregistrement
             await updateDoc(orderRef, {
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
               updatedAt: new Date(),
             });
 
-            console.error(`⚠️ Domaine ${domain} payé mais enregistrement échoué:`, registerResult.error);
+            logger.warn(`Domain ${domain} paid but registration failed`, { error: registerResult.error });
           }
         }
         break;
@@ -110,7 +115,9 @@ export async function POST(request: NextRequest) {
           const orderId = paymentIntent.metadata.orderId;
           const domain = paymentIntent.metadata.domain;
 
-          console.error(`❌ Paiement échoué pour domaine ${domain}`);
+          logger.warn(`Payment failed for domain ${domain}`, {
+            error: paymentIntent.last_payment_error?.message,
+          });
 
           const orderRef = doc(db, 'domain_orders', orderId);
           await updateDoc(orderRef, {
@@ -123,12 +130,12 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Événement non géré: ${event.type}`);
+        logger.debug(`Unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error('❌ Erreur traitement webhook:', error);
+    logger.error('Webhook processing error', { error: error.message });
     return NextResponse.json(
       { error: error.message || 'Webhook processing error' },
       { status: 500 }

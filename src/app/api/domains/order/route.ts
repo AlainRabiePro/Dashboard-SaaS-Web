@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
+import { createLogger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rate-limiter';
 
 /**
  * API pour commander un domaine
  * Crée une commande en attente de paiement
  */
+
+const logger = createLogger('domains/order');
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -24,6 +28,21 @@ export async function POST(request: NextRequest) {
     const userId = request.headers.get('x-user-id');
     if (!userId) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
+    // Rate limiting
+    const rateLimitKey = `order:${userId}`;
+    const rateLimit = checkRateLimit(rateLimitKey, {
+      windowMs: 60 * 1000,
+      maxRequests: 10,
+    });
+
+    if (!rateLimit.allowed) {
+      logger.warn(`Rate limit exceeded for user ${userId}`);
+      return NextResponse.json(
+        { error: 'Trop de requêtes. Réessayez plus tard.' },
+        { status: 429 }
+      );
     }
 
     const body = await request.json();
@@ -73,7 +92,7 @@ export async function POST(request: NextRequest) {
       stripeSessionId: null,
     });
 
-    console.log(`✅ Commande créée pour ${domain} (${orderRef.id})`);
+    logger.info(`Order created for domain ${domain}`, { orderId: orderRef.id, price });
 
     return NextResponse.json({
       success: true,
@@ -84,7 +103,7 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
   } catch (error: any) {
-    console.error('Erreur:', error);
+    logger.error('Order creation error', { error: error.message });
     return NextResponse.json(
       { error: error.message || 'Erreur lors de la création de la commande' },
       { status: 500 }
@@ -100,6 +119,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
+    // Rate limiting on GET
+    const rateLimitKey = `order-get:${userId}`;
+    const rateLimit = checkRateLimit(rateLimitKey, {
+      windowMs: 60 * 1000,
+      maxRequests: 30,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Trop de requêtes. Réessayez plus tard.' },
+        { status: 429 }
+      );
+    }
+
     const q = query(
       collection(db, 'domain_orders'),
       where('userId', '==', userId)
@@ -113,9 +146,10 @@ export async function GET(request: NextRequest) {
       expiresAt: doc.data().expiresAt instanceof Date ? doc.data().expiresAt : new Date(doc.data().expiresAt),
     }));
 
+    logger.info(`Fetched ${orders.length} orders for user ${userId}`);
     return NextResponse.json({ orders });
   } catch (error: any) {
-    console.error('Erreur:', error);
+    logger.error('Order fetch error', { error: error.message });
     return NextResponse.json(
       { error: error.message || 'Erreur lors de la récupération des commandes' },
       { status: 500 }
