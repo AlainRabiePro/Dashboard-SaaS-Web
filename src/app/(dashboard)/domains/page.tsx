@@ -18,7 +18,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Clock, XCircle, Search, Loader2, Plus, Trash2 } from "lucide-react";
+import { useDomainSearch } from "@/hooks/use-domain-search";
+import { CheckCircle2, Clock, XCircle, Search, Loader2, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 interface Domain {
   id: string;
@@ -30,14 +31,20 @@ interface Domain {
 }
 
 export default function DomainsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { searchDomainVariations, orderDomain, fetchOrders, searchLoading, searchResults, orders } = useDomainSearch();
+  
   const [search, setSearch] = useState("");
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpenDialog, setIsOpenDialog] = useState(false);
   const [newDomain, setNewDomain] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Search & Buy states
+  const [searchInput, setSearchInput] = useState("");
+  const [orderingDomain, setOrderingDomain] = useState<string | null>(null);
 
   const fetchDomains = async () => {
     if (!user?.uid) return;
@@ -63,6 +70,7 @@ export default function DomainsPage() {
   useEffect(() => {
     if (user?.uid) {
       fetchDomains();
+      fetchOrders();
     }
   }, [user?.uid]);
 
@@ -136,10 +144,123 @@ export default function DomainsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Section Achat de Domaines */}
+      <Card className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-blue-500" />
+            Trouver & Acheter un Domaine
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4">
+            <div>
+              <Label htmlFor="search-domain">Mot-clé (ex: google, amazon...)</Label>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  id="search-domain"
+                  placeholder="Entrez un mot-clé"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && searchDomainVariations(searchInput)}
+                  className="bg-white/5 border-white/10"
+                />
+                <Button
+                  onClick={() => searchDomainVariations(searchInput)}
+                  disabled={searchLoading || !searchInput.trim()}
+                  className="gap-2"
+                >
+                  {searchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Rechercher
+                </Button>
+              </div>
+            </div>
+
+            {/* Résultats de recherche en grille */}
+            {searchResults.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-3 text-muted-foreground">
+                  {searchResults.filter(r => r.available).length} domaine(s) disponible(s) sur {searchResults.length}
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                  {searchResults.map((result) => (
+                    <div
+                      key={result.domain}
+                      className={`p-3 rounded-lg border transition-all cursor-pointer hover:border-white/30 ${
+                        result.available
+                          ? 'bg-green-500/5 border-green-500/20 hover:bg-green-500/10'
+                          : 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10 opacity-60'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div>
+                          <p className="font-medium text-sm truncate">{result.domain}</p>
+                          <p className={`text-xs ${result.available ? 'text-green-400' : 'text-red-400'}`}>
+                            {result.available ? '✅ Libre' : '❌ Pris'}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-white/10">
+                          <span className="text-xs font-medium">{result.price}€</span>
+                          {result.available && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setOrderingDomain(result.domain);
+                                orderDomain(result.domain, result.price);
+                              }}
+                              disabled={searchLoading || orderingDomain === result.domain}
+                              className="h-6 px-2 text-xs"
+                            >
+                              {orderingDomain === result.domain ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mes Commandes */}
+            {orders.length > 0 && (
+              <div className="border-t pt-4">
+                <p className="font-medium mb-3">Mes Commandes</p>
+                <div className="space-y-2">
+                  {orders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                      <div>
+                        <p className="font-medium text-sm">{order.domain}</p>
+                        <p className="text-xs text-muted-foreground">{order.price}€</p>
+                      </div>
+                      <Badge className={
+                        order.status === 'paid' ? 'bg-green-500/20 text-green-400' :
+                        order.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                        'bg-red-500/20 text-red-400'
+                      }>
+                        {order.status === 'paid' ? '✅ Payé' : 
+                         order.status === 'pending' ? '⏳ Paiement' : 
+                         '❌ Expiré'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section Domaines personnalisés existants */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold">Domaines</h1>
-          <p className="text-sm text-muted-foreground">Gérez vos domaines personnalisés</p>
+          <h1 className="text-3xl font-bold">Domaines Personnalisés</h1>
+          <p className="text-sm text-muted-foreground">Gérez vos domaines liés à vos projets</p>
         </div>
 
         <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>

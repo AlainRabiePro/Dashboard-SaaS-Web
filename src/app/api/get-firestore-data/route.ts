@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, collection, getDocs, initializeApp, getApps } from 'firebase/firestore';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { initializeApp, getApps } from 'firebase/app';
 
 /**
  * API pour récupérer les données Firestore d'un projet

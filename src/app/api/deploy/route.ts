@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveTxt, resolveCname } from 'dns/promises';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { initializeApp, getApps } from 'firebase/app';
 
 // Types
 interface DeployRequest {
@@ -15,6 +18,100 @@ async function verifyAuth(token: string): Promise<boolean> {
   // Le token est généré côté client et contient les données utilisateur
   return token.length > 0;
 }
+
+// Vérifier que le domaine n'existe pas déjà pour cet utilisateur
+async function isDomainAlreadyDeployed(userId: string, domain: string): Promise<boolean> {
+  try {
+    // Utiliser Firebase Admin SDK pour la vérification côté serveur
+    const admin = require('firebase-admin');
+    const adminDb = admin.firestore();
+    
+    const sitesRef = adminDb.collection('users').doc(userId).collection('sites');
+    const snapshot = await sitesRef.where('domain', '==', domain).get();
+    
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('Erreur lors de la vérification du domaine:', error);
+    // En cas d'erreur, on retourne false pour ne pas bloquer
+    return false;
+  }
+}
+
+// ✅ NOUVEAU : Vérifier que le repo Git existe et est accessible
+async function verifyGitRepositoryAccess(repoUrl: string): Promise<{ accessible: boolean; error?: string }> {
+  try {
+    const { execSync } = require('child_process');
+    
+    // Tenter une connexion git ls-remote pour vérifier l'accès
+    // Cela vérifie que le repo existe ET qu'on peut y accéder
+    const result = execSync(`git ls-remote --heads ${repoUrl}`, {
+      timeout: 10000, // 10 secondes
+      stdio: 'pipe',
+    }).toString();
+    
+    // Si on arrive ici, le repo est accessible
+    return { accessible: true };
+  } catch (error: any) {
+    console.error('Erreur d\'accès au repo:', error.message);
+    
+    let errorMessage = 'Impossible d\'accéder au repository';
+    
+    if (error.message.includes('Repository not found')) {
+      errorMessage = `Le repository n'existe pas: ${repoUrl}`;
+    } else if (error.message.includes('Permission denied') || error.message.includes('401')) {
+      errorMessage = `Accès refusé au repository. Vérifiez que le repo est public ou que vous avez les permissions.`;
+    } else if (error.message.includes('timeout')) {
+      errorMessage = `Timeout lors de la vérification du repository. Le serveur est trop lent.`;
+    } else if (error.message.includes('not a git repository')) {
+      errorMessage = `L'URL fournie n'est pas un repository Git valide`;
+    }
+    
+    return { accessible: false, error: errorMessage };
+  }
+}
+
+// ✅ NOUVEAU : Vérifier la propriété du domaine via TXT record DNS
+async function verifyDomainOwnership(domain: string, userId: string, validationToken: string): Promise<{ verified: boolean; error?: string; requiredRecord?: string }> {
+  try {
+    // Le TXT record que l'utilisateur doit ajouter
+    const requiredRecord = `dashboard-saas-${userId}-${validationToken}`;
+    
+    // Chercher le TXT record
+    const txtRecords = await resolveTxt(domain);
+    console.log(`🔍 TXT records pour ${domain}:`, txtRecords);
+    
+    // Vérifier si le TXT record requis existe
+    for (const records of txtRecords) {
+      const txtValue = records.join('');
+      console.log(`   Checking: ${txtValue}`);
+      if (txtValue.includes(requiredRecord)) {
+        console.log(`✅ TXT record trouvé pour ${domain}`);
+        return { verified: true };
+      }
+    }
+    
+    // TXT record non trouvé
+    return { 
+      verified: false, 
+      error: `TXT record de vérification non trouvé pour ${domain}`,
+      requiredRecord 
+    };
+  } catch (error: any) {
+    console.error('Erreur lors de la vérification DNS:', error.message);
+    
+    let errorMessage = 'Impossible de vérifier le domaine';
+    
+    if (error.code === 'ENOTFOUND' || error.message.includes('getaddrinfo')) {
+      errorMessage = `Le domaine "${domain}" n'existe pas ou n'a pas de records DNS configurés`;
+    } else if (error.code === 'ENODATA') {
+      errorMessage = `Aucun TXT record trouvé pour "${domain}". Vérifiez que le record a été ajouté.`;
+    }
+    
+    return { verified: false, error: errorMessage };
+  }
+}
+
+
 
 // Fonction pour exécuter le déploiement via SSH
 async function deployViaSsh(domain: string, repoUrl: string, userId: string, adsenseId?: string): Promise<string> {
@@ -160,6 +257,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `URL Git invalide: "${body.repoUrl}" (doit terminer par .git)` },
         { status: 400 }
+      );
+    }
+
+    // ✅ NOUVEAU : Vérifier que le repo Git existe et est accessible
+    console.log('🔍 Vérification de l\'accès au repository...');
+    const repoCheck = await verifyGitRepositoryAccess(body.repoUrl);
+    if (!repoCheck.accessible) {
+      return NextResponse.json(
+        { 
+          error: repoCheck.error || 'Le repository n\'est pas accessible',
+          code: 'REPO_NOT_ACCESSIBLE'
+        },
+        { status: 400 }
+      );
+    }
+    console.log('✅ Repository accessible');
+
+    // ✅ NOUVEAU : Vérifier la propriété du domaine
+    console.log('🔐 Vérification de la propriété du domaine...');
+    const validationToken = Math.random().toString(36).substring(2, 10); // Token aléatoire
+    const domainCheck = await verifyDomainOwnership(body.domain, body.userId, validationToken);
+    if (!domainCheck.verified) {
+      return NextResponse.json(
+        { 
+          error: domainCheck.error || 'Impossible de vérifier la propriété du domaine',
+          code: 'DOMAIN_OWNERSHIP_UNVERIFIED',
+          verification: {
+            domain: body.domain,
+            requiredTxtRecord: domainCheck.requiredRecord,
+            instructions: `Ajoutez ce TXT record à votre domaine: ${domainCheck.requiredRecord}`
+          }
+        },
+        { status: 403 } // 403 Forbidden
+      );
+    }
+    console.log('✅ Propriété du domaine vérifiée');
+
+    // ✅ Vérifier que le domaine n'existe pas déjà
+    const domainAlreadyExists = await isDomainAlreadyDeployed(body.userId, body.domain);
+    if (domainAlreadyExists) {
+      return NextResponse.json(
+        { 
+          error: 'Ce domaine est déjà déployé',
+          message: `Le domaine "${body.domain}" est déjà associé à un de vos sites. Veuillez utiliser un domaine différent ou supprimer le déploiement existant.`,
+          code: 'DOMAIN_ALREADY_DEPLOYED'
+        },
+        { status: 409 } // 409 Conflict
       );
     }
 

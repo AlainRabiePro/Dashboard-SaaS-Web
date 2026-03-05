@@ -56,6 +56,12 @@ export default function SitesPage() {
 
       if (!deployResponse.ok) {
         const error = await deployResponse.json();
+        
+        // Gestion spécifique de l'erreur de domaine en doublon
+        if (error.code === 'DOMAIN_ALREADY_DEPLOYED' || deployResponse.status === 409) {
+          throw new Error(error.message || `Le domaine "${newDomain}" est déjà déployé. Veuillez utiliser un domaine différent.`);
+        }
+        
         throw new Error(error.message || "Erreur lors du déploiement");
       }
 

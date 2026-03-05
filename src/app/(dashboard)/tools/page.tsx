@@ -402,6 +402,29 @@ export default function ToolsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        
+        // Gestion spécifique de la propriété du domaine non vérifiée
+        if (error.code === 'DOMAIN_OWNERSHIP_UNVERIFIED' || response.status === 403) {
+          const txtRecord = error.verification?.requiredTxtRecord;
+          const domain = error.verification?.domain;
+          throw new Error(
+            `Impossible de vérifier que vous êtes propriétaire de "${domain}". ` +
+            `Veuillez ajouter ce TXT record à votre domaine:\n\n` +
+            `${txtRecord}\n\n` +
+            `Une fois ajouté, attendez quelques minutes et réessayez.`
+          );
+        }
+        
+        // Gestion spécifique de l'erreur de domaine en doublon
+        if (error.code === 'DOMAIN_ALREADY_DEPLOYED' || response.status === 409) {
+          throw new Error(error.message || `Le domaine "${deployForm.domain}" est déjà déployé. Veuillez utiliser un domaine différent.`);
+        }
+        
+        // Gestion spécifique de l'erreur de repo inaccessible
+        if (error.code === 'REPO_NOT_ACCESSIBLE' || response.status === 400) {
+          throw new Error(error.error || error.message || 'Impossible d\'accéder au repository');
+        }
+        
         throw new Error(error.error || error.message || 'Erreur lors du déploiement');
       }
 

@@ -2,11 +2,44 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 /**
  * API pour déployer un site sur le VPS
  * Crée la structure de dossiers sur le VPS
  */
+
+// ✅ Vérifier que le repo Git existe et est accessible
+async function verifyGitRepositoryAccess(repoUrl: string): Promise<{ accessible: boolean; error?: string }> {
+  try {
+    const { execSync } = require('child_process');
+    
+    // Tenter une connexion git ls-remote pour vérifier l'accès
+    const result = execSync(`git ls-remote --heads ${repoUrl}`, {
+      timeout: 10000, // 10 secondes
+      stdio: 'pipe',
+    }).toString();
+    
+    return { accessible: true };
+  } catch (error: any) {
+    console.error('Erreur d\'accès au repo:', error.message);
+    
+    let errorMessage = 'Impossible d\'accéder au repository';
+    
+    if (error.message.includes('Repository not found')) {
+      errorMessage = `Le repository n'existe pas: ${repoUrl}`;
+    } else if (error.message.includes('Permission denied') || error.message.includes('401')) {
+      errorMessage = `Accès refusé au repository. Vérifiez que le repo est public ou que vous avez les permissions.`;
+    } else if (error.message.includes('timeout')) {
+      errorMessage = `Timeout lors de la vérification du repository. Le serveur est trop lent.`;
+    } else if (error.message.includes('not a git repository')) {
+      errorMessage = `L'URL fournie n'est pas un repository Git valide`;
+    }
+    
+    return { accessible: false, error: errorMessage };
+  }
+}
+
 
 let adminApp = getApps()[0];
 if (!adminApp) {
@@ -166,10 +199,29 @@ export async function POST(request: NextRequest) {
     console.log('✅ Authentification OK pour:', userId);
 
     const body = await request.json();
-    const { siteName } = body;
+    const { siteName, domain } = body;
 
     if (!siteName) {
       return NextResponse.json({ error: 'siteName requis' }, { status: 400 });
+    }
+
+    // ✅ NOUVEAU : Vérifier que le domaine/site n'existe pas déjà
+    if (domain) {
+      const db = getFirestore();
+      const sitesRef = collection(db, 'users', userId, 'sites');
+      const q = query(sitesRef, where('domain', '==', domain));
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        return NextResponse.json(
+          { 
+            error: 'Ce domaine est déjà déployé',
+            message: `Le domaine "${domain}" est déjà associé à un de vos sites. Veuillez utiliser un domaine différent.`,
+            code: 'DOMAIN_ALREADY_DEPLOYED'
+          },
+          { status: 409 } // 409 Conflict
+        );
+      }
     }
 
     // Déployer le site sur le VPS
