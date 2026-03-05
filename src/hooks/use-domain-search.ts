@@ -123,7 +123,8 @@ export function useDomainSearch() {
 
     setSearchLoading(true);
     try {
-      const response = await fetch('/api/domains/order', {
+      // Étape 1: Créer la commande
+      const orderResponse = await fetch('/api/domains/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,24 +136,57 @@ export function useDomainSearch() {
         }),
       });
 
-      const data = await response.json();
+      const orderData = await orderResponse.json();
 
-      if (!response.ok) {
+      if (!orderResponse.ok) {
         toast({
           title: 'Erreur',
-          description: data.error || 'Impossible de commander le domaine',
+          description: orderData.error || 'Impossible de créer la commande',
           variant: 'destructive',
         });
         return false;
       }
 
-      toast({
-        title: 'Succès',
-        description: `Commande créée pour ${domain}. Statut: ${data.status}`,
+      const orderId = orderData.orderId;
+
+      // Étape 2: Créer la session de paiement Stripe
+      const checkoutResponse = await fetch('/api/domains/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+          'x-user-email': user.email || '',
+        },
+        body: JSON.stringify({
+          orderId,
+          domain,
+          price,
+        }),
       });
 
-      await fetchOrders();
-      return true;
+      const checkoutData = await checkoutResponse.json();
+
+      if (!checkoutResponse.ok) {
+        toast({
+          title: 'Erreur',
+          description: checkoutData.error || 'Impossible de créer la session de paiement',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      // Étape 3: Rediriger vers Stripe Checkout
+      if (checkoutData.checkoutUrl) {
+        window.location.href = checkoutData.checkoutUrl;
+        return true;
+      } else {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de rediriger vers le paiement',
+          variant: 'destructive',
+        });
+        return false;
+      }
     } catch (error: any) {
       toast({
         title: 'Erreur',
