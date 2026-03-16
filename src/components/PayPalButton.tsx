@@ -134,3 +134,5 @@ export function PayPalButton({
 
   return <div ref={containerRef} className="paypal-button-container" />;
 }
+
+export default PayPalButton;

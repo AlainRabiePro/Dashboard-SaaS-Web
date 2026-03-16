@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Zap, Activity } from "lucide-react";
+import PayPalButton from "@/components/PayPalButton";
 
 const PLANS = [
   {
@@ -67,7 +68,6 @@ export default function SelectPlanPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [selectedPlanId, setSelectedPlanId] = useState<string>("professional");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [isChecking, setIsChecking] = useState(true);
 
@@ -138,53 +138,13 @@ export default function SelectPlanPage() {
     setSelectedPlanId(planId);
   };
 
-  const handleConfirmPlan = async () => {
-    setIsLoading(true);
-    setError("");
+  const handlePayPalSuccess = () => {
+    // Payment was successful, redirect to billing page
+    router.push("/billing?success=true");
+  };
 
-    try {
-      // Vérifier que l'utilisateur est authentifié
-      if (!user) {
-        throw new Error("Utilisateur non authentifié");
-      }
-
-      const plan = PLANS.find(p => p.id === selectedPlanId);
-      if (!plan) throw new Error("Plan not found");
-
-      const token = await user.getIdToken();
-
-      // Appeler l'API pour créer l'abonnement Stripe
-      const response = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          planId: plan.id,
-          priceId: plan.stripePriceId,
-          email: user.email,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Erreur lors de la création de l'abonnement");
-      }
-
-      const data = await response.json();
-
-      // Rediriger vers Stripe pour le paiement
-      if (data.sessionUrl) {
-        window.location.href = data.sessionUrl;
-      } else {
-        // Si pas de paiement (mode test), rediriger vers le dashboard
-        router.push("/dashboard");
-      }
-    } catch (err: any) {
-      setError(err.message);
-      setIsLoading(false);
-    }
+  const handlePayPalError = (error: string) => {
+    setError(error);
   };
 
   return (
@@ -259,14 +219,41 @@ export default function SelectPlanPage() {
           ))}
         </div>
 
+        {selectedPlanId && (
+          <div className="mt-8 bg-primary/5 border border-primary/20 rounded-lg p-8">
+            {(() => {
+              const selectedPlan = PLANS.find(p => p.id === selectedPlanId);
+              return selectedPlan ? (
+                <div className="flex flex-col items-center gap-6">
+                  <div className="text-center">
+                    <h3 className="text-2xl font-bold mb-2">
+                      {selectedPlan.name} Plan - ${selectedPlan.price}/month
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Cliquez ci-dessous pour finaliser votre paiement via PayPal
+                    </p>
+                  </div>
+                  <PayPalButton
+                    planId={selectedPlan.id}
+                    planName={selectedPlan.name}
+                    amount={Math.round(selectedPlan.price * 100)} // Convert to cents
+                    onSuccess={handlePayPalSuccess}
+                    onError={handlePayPalError}
+                  />
+                </div>
+              ) : null;
+            })()}
+          </div>
+        )}
+
         <div className="text-center">
           <Button
             size="lg"
-            onClick={handleConfirmPlan}
-            disabled={isLoading}
-            className="px-12"
+            onClick={() => setSelectedPlanId("")}
+            variant="outline"
+            className="px-12 mt-4"
           >
-            {isLoading ? "Chargement..." : "Continuer avec ce plan"}
+            Annuler la sélection
           </Button>
         </div>
 
