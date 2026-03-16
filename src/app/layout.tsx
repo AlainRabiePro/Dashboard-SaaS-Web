@@ -72,7 +72,7 @@ export default function RootLayout({
         {/* PayPal Script */}
         {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID && (
           <Script
-            src={`https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&locale=fr_FR`}
+            src={`https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&locale=fr_FR&currency=EUR`}
             strategy="afterInteractive"
           />
         )}

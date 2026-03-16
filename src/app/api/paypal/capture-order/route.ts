@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Capturer la commande
     const captureResponse = await fetch(
-      `https://api.paypal.com/v2/checkout/orders/${orderId}/capture`,
+      `https://api.sandbox.paypal.com/v2/checkout/orders/${orderId}/capture`,
       {
         method: 'POST',
         headers: {

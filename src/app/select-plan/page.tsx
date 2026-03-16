@@ -219,6 +219,15 @@ export default function SelectPlanPage() {
           ))}
         </div>
 
+        {/* Debug: afficher l'état */}
+        {selectedPlanId && (
+          <div className="mt-8 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-8">
+            <p className="text-sm text-blue-400">
+              Plan sélectionné: {selectedPlanId} | État: {selectedPlanId ? "défini" : "vide"}
+            </p>
+          </div>
+        )}
+
         {selectedPlanId && (
           <div className="mt-8 bg-primary/5 border border-primary/20 rounded-lg p-8">
             {(() => {

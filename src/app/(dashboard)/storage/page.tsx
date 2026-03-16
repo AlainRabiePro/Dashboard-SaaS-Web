@@ -13,6 +13,7 @@ import { formatStorage } from "@/lib/format-storage";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { HardDrive, AlertTriangle, TrendingUp, Check, X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import PayPalButton from "@/components/PayPalButton";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +74,7 @@ export default function StoragePage() {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<{ name: UserProfile['plan'], limit: number, price: number } | null>(null);
   const [isCalculatingStorage, setIsCalculatingStorage] = useState(false);
 
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
@@ -151,21 +153,33 @@ export default function StoragePage() {
 
   const COLORS = ['hsl(var(--primary))', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)'];
 
-  async function handleSelectPlan(planName: UserProfile['plan'], limit: number) {
-    if (!user) return;
-    setIsUpdating(planName);
+  async function handleSelectPlan(planName: UserProfile['plan'], limit: number, price: number) {
+    // Ouvrir le modal de paiement PayPal
+    setSelectedPlanForPayment({ name: planName, limit, price });
+  }
+
+  async function handlePayPalSuccess() {
+    if (!user || !selectedPlanForPayment) return;
+    
     try {
-      updateUserPlan(user.uid, planName, limit);
+      updateUserPlan(user.uid, selectedPlanForPayment.name, selectedPlanForPayment.limit);
       toast({
         title: "Plan mis à jour",
-        description: `Vous êtes maintenant sur le plan ${planName}.`,
+        description: `Vous êtes maintenant sur le plan ${selectedPlanForPayment.name}.`,
       });
+      setSelectedPlanForPayment(null);
       setIsDialogOpen(false);
     } catch (e) {
       // Les erreurs sont gérées par l'ErrorEmitter global
-    } finally {
-      setIsUpdating(null);
     }
+  }
+
+  function handlePayPalError(error: string) {
+    toast({
+      title: "Erreur de paiement",
+      description: error,
+      variant: "destructive"
+    });
   }
 
   if (profileLoading || sitesLoading) return null;
@@ -256,14 +270,27 @@ export default function StoragePage() {
                               ))}
                             </div>
 
-                            <Button 
-                              variant={plan.buttonVariant} 
-                              className="w-full h-12 font-bold uppercase text-[11px] tracking-[0.15em] rounded-xl"
-                              onClick={() => handleSelectPlan(plan.name, plan.limit)}
-                              disabled={isCurrent || (isUpdating === plan.name)}
-                            >
-                              {isUpdating === plan.name ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? "PLAN ACTUEL" : "CHOISIR CE PLAN"}
-                            </Button>
+                            {selectedPlanForPayment?.name === plan.name ? (
+                              <div className="w-full">
+                                <p className="text-xs text-center text-zinc-400 mb-3">Finalisez votre paiement</p>
+                                <PayPalButton
+                                  planId={plan.name}
+                                  planName={plan.name}
+                                  amount={Math.round(parseFloat(plan.price) * 100)}
+                                  onSuccess={handlePayPalSuccess}
+                                  onError={handlePayPalError}
+                                />
+                              </div>
+                            ) : (
+                              <Button 
+                                variant={plan.buttonVariant} 
+                                className="w-full h-12 font-bold uppercase text-[11px] tracking-[0.15em] rounded-xl"
+                                onClick={() => handleSelectPlan(plan.name, plan.limit, parseFloat(plan.price))}
+                                disabled={isCurrent || (isUpdating === plan.name)}
+                              >
+                                {isUpdating === plan.name ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? "PLAN ACTUEL" : "CHOISIR CE PLAN"}
+                              </Button>
+                            )}
                           </div>
                         );
                       })}
