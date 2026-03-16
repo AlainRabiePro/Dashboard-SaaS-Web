@@ -69,6 +69,24 @@ export default function RootLayout({
           </>
         )}
 
+        {/* PayPal Script */}
+        {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID && (
+          <Script
+            src={`https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&locale=fr_FR`}
+            strategy="afterInteractive"
+          />
+        )}
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}');
+                `,
+              }}
+            />
+          </>
+        )}
+
         {/* Structured Data - JSON-LD */}
         <Script
           id="structured-data"
