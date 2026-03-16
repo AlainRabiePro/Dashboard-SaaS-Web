@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { DatabaseType } from '@/lib/database-types';
 
 interface FetchRequest {
-  siteId: string;
-  databaseId: string;
+  siteId?: string;
+  databaseId?: string;
   type: DatabaseType;
-  config: any;
+  config?: any;
 }
 
 /**
@@ -21,9 +21,16 @@ export async function POST(request: NextRequest) {
     const body: FetchRequest = await request.json();
     const { siteId, databaseId, type, config } = body;
 
+    if (!type) {
+      return NextResponse.json(
+        { error: 'Type de base de données manquant' },
+        { status: 400 }
+      );
+    }
+
     switch (type) {
       case 'firestore':
-        return await fetchFirestoreCollections(config);
+        return await fetchFirestoreCollections(userId, siteId);
       case 'supabase':
         return await fetchSupabaseCollections(config);
       case 'mysql':
@@ -45,17 +52,26 @@ export async function POST(request: NextRequest) {
 /**
  * Récupère les collections Firestore
  */
-async function fetchFirestoreCollections(config: any) {
+async function fetchFirestoreCollections(userId: string, siteId?: string) {
   try {
     // Importer dynamiquement les dépendances Firestore côté serveur
     const { initializeApp, getApps } = await import('firebase/app');
     const { getFirestore, getDocs, collection } = await import('firebase/firestore');
 
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    };
+
     const appName = `firestore-${Date.now()}`;
     let db;
 
     try {
-      const app = initializeApp(config, appName);
+      const app = initializeApp(firebaseConfig, appName);
       db = getFirestore(app);
     } catch (e) {
       // App déjà initialisée
@@ -63,13 +79,13 @@ async function fetchFirestoreCollections(config: any) {
       db = getFirestore(existingApp!);
     }
 
-    // Lister les collections (limité car Firestore n'a pas d'API native)
+    // ✅ FIXED: Lister les collections de l'utilisateur
     const collections_data: any = {};
-    const commonCollections = ['sites', 'domains', 'deploymentLogs', 'configs', 'data', 'logs', 'users'];
+    const collectionsToFetch = ['sites', 'domains', 'logs', 'settings', 'backups'];
 
-    for (const collName of commonCollections) {
+    for (const collName of collectionsToFetch) {
       try {
-        const collRef = collection(db, collName);
+        const collRef = collection(db, 'users', userId, collName);
         const snap = await getDocs(collRef);
 
         if (snap.size > 0) {
@@ -81,7 +97,7 @@ async function fetchFirestoreCollections(config: any) {
           };
         }
       } catch (e) {
-        // Collection doesn't exist
+        console.warn(`⚠️  Collection "${collName}" not found:`, e);
       }
     }
 
@@ -90,6 +106,7 @@ async function fetchFirestoreCollections(config: any) {
       collections: collections_data,
     });
   } catch (error: any) {
+    console.error('Error in fetchFirestoreCollections:', error);
     return NextResponse.json(
       { error: error.message || 'Erreur Firestore' },
       { status: 400 }

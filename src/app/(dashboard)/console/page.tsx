@@ -32,6 +32,7 @@ import {
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
+import { CreateFileDialog } from "@/components/create-file-dialog";
 
 // Lazy load Monaco Editor
 const MonacoEditor = dynamic(
@@ -84,6 +85,8 @@ export default function ConsolePage() {
   const [lastCommandStatus, setLastCommandStatus] = useState<'success' | 'error' | null>(null);
   const [lastCommandOutput, setLastCommandOutput] = useState<string>("");
   const [logsTabRef, setLogsTabRef] = useState<HTMLElement | null>(null);
+  const [isUpdatingScripts, setIsUpdatingScripts] = useState(false);
+  const [isInstallingDeps, setIsInstallingDeps] = useState(false);
   const editorRef = useRef<any>(null);
 
   // Fetch projects on mount
@@ -326,6 +329,71 @@ export default function ConsolePage() {
     }
   };
 
+  const updateTestScripts = async () => {
+    if (!selectedProject || !user?.uid) return;
+
+    setIsUpdatingScripts(true);
+    try {
+      const response = await fetch('/api/console/update-scripts', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+          'x-project-id': selectedProject,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert('✅ Scripts de test ajoutés avec succès!\n\n' + 
+              Object.entries(data.scripts)
+                .filter(([key]) => key.includes('test'))
+                .map(([key, value]) => `"${key}": "${value}"`)
+                .join('\n'));
+      } else {
+        const error = await response.json();
+        alert('❌ Erreur: ' + (error.error || 'Erreur inconnue'));
+      }
+    } catch (error) {
+      console.error('Error updating scripts:', error);
+      alert('Erreur lors de la mise à jour des scripts');
+    } finally {
+      setIsUpdatingScripts(false);
+    }
+  };
+
+  const installDependencies = async () => {
+    if (!selectedProject || !user?.uid) return;
+
+    const confirmed = confirm('Cela peut prendre plusieurs minutes. Continuer?');
+    if (!confirmed) return;
+
+    setIsInstallingDeps(true);
+    try {
+      const response = await fetch('/api/console/npm-install', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+          'x-project-id': selectedProject,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert('✅ Dépendances installées avec succès!');
+      } else {
+        const error = await response.json();
+        alert('❌ Erreur: ' + (error.error || 'Erreur inconnue'));
+      }
+    } catch (error) {
+      console.error('Error installing dependencies:', error);
+      alert('Erreur lors de l\'installation des dépendances');
+    } finally {
+      setIsInstallingDeps(false);
+    }
+  };
+
   const getLogColor = (level: string) => {
     switch (level.toLowerCase()) {
       case 'error': return 'bg-red-500/10 text-red-400 border-red-500/20';
@@ -375,8 +443,25 @@ export default function ConsolePage() {
               </SelectContent>
             </Select>
             {selectedProject && (
-              <div className="text-sm text-muted-foreground">
-                {projects.find(p => p.id === selectedProject)?.domain}
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-muted-foreground">
+                  {projects.find(p => p.id === selectedProject)?.domain}
+                </div>
+                <Button
+                  onClick={installDependencies}
+                  disabled={!selectedProject || isInstallingDeps}
+                  size="sm"
+                  variant="outline"
+                  className="text-amber-500 border-amber-500/20 hover:bg-amber-500/10"
+                  title="Installer les dépendances npm"
+                >
+                  {isInstallingDeps ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4 mr-2" />
+                  )}
+                  npm install
+                </Button>
               </div>
             )}
           </div>
@@ -407,6 +492,30 @@ export default function ConsolePage() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                  <CreateFileDialog
+                    projectId={selectedProject}
+                    userId={user?.uid || ''}
+                    onFileCreated={(fileName, filePath) => {
+                      // Rafraîchir la liste des fichiers
+                      if (selectedProject) {
+                        fetchFiles(selectedProject);
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={updateTestScripts}
+                    disabled={!selectedProject || isUpdatingScripts}
+                    size="sm"
+                    variant="outline"
+                    title="Ajouter les scripts de test au package.json"
+                  >
+                    {isUpdatingScripts ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <TestTube className="h-4 w-4 mr-2" />
+                    )}
+                    Ajouter scripts test
+                  </Button>
                   <Button
                     onClick={() => executeCommand('build')}
                     disabled={!selectedProject || isBuilding}

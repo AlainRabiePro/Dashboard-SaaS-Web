@@ -29,6 +29,7 @@ export default function MonitoringPage() {
   const [checkMessage, setCheckMessage] = useState<string>('');
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
+  const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
 
   // Récupérer les alertes
   const fetchAlerts = async () => {
@@ -57,8 +58,10 @@ export default function MonitoringPage() {
 
   // Marquer une alerte comme résolue
   const resolveAlert = async (siteId: string, alertId: string) => {
-    if (!user?.uid) return;
+    if (!user?.uid || resolvingAlertId === alertId) return; // Éviter les clics multiples
     try {
+      setResolvingAlertId(alertId); // Désactiver le bouton
+      console.log(`[RESOLVE ALERT] Tentative de résolution - siteId: ${siteId}, alertId: ${alertId}`);
       const response = await fetch('/api/alerts', {
         method: 'PATCH',
         headers: {
@@ -68,12 +71,20 @@ export default function MonitoringPage() {
         body: JSON.stringify({ siteId, alertId }),
       });
 
+      console.log(`[RESOLVE ALERT] Réponse du serveur:`, response.status);
       if (response.ok) {
+        const data = await response.json();
+        console.log(`[RESOLVE ALERT] Succès:`, data);
         // Re-charger les alertes
         await fetchAlerts();
+      } else {
+        const error = await response.json();
+        console.error(`[RESOLVE ALERT] Erreur serveur:`, error);
       }
     } catch (error) {
-      console.error('Error resolving alert:', error);
+      console.error('[RESOLVE ALERT] Erreur client:', error);
+    } finally {
+      setResolvingAlertId(null); // Réactiver le bouton
     }
   };
 
@@ -361,17 +372,17 @@ export default function MonitoringPage() {
                         </div>
                         <button
                           onClick={() => {
-                            // Find the siteId from the alert
-                            const site = sites.find(s => 
-                              alerts.find(a => a.documentId === alert.documentId)
-                            ) || allSites[0];
-                            if (site?.id) {
-                              resolveAlert(site.id, alert.documentId);
+                            // L'alerte a déjà le siteId
+                            if (alert.siteId) {
+                              resolveAlert(alert.siteId, alert.documentId);
+                            } else {
+                              console.warn('siteId manquant pour l\'alerte', alert);
                             }
                           }}
-                          className="px-2 py-1 text-xs bg-white/10 hover:bg-white/20 rounded text-muted-foreground hover:text-white transition-colors"
+                          disabled={resolvingAlertId === alert.documentId}
+                          className="px-2 py-1 text-xs bg-white/10 hover:bg-white/20 rounded text-muted-foreground hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Résoudre
+                          {resolvingAlertId === alert.documentId ? 'Résolution...' : 'Résoudre'}
                         </button>
                       </div>
                     );

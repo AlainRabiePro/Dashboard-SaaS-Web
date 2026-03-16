@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/select";
 import type { Site, UserProfile } from "@/lib/firestore-service";
 import { DatabaseConfigDialog } from "@/components/database-config-dialog";
+import { DocumentEditDialog } from "@/components/document-edit-dialog";
 import { DATABASE_TYPES } from "@/lib/database-types";
+import { Edit2, Trash2 } from "lucide-react";
 
 export default function DatabasePage() {
   const { user } = useAuth();
@@ -39,6 +41,13 @@ export default function DatabasePage() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Document editing state
+  const [editingDocument, setEditingDocument] = useState<any>(null);
+  const [editingCollectionName, setEditingCollectionName] = useState<string>("");
+  const [editingDocumentId, setEditingDocumentId] = useState<string>("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isNewDocument, setIsNewDocument] = useState(false);
 
   // Récupérer le profil utilisateur
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
@@ -261,6 +270,121 @@ export default function DatabasePage() {
     }
   };
 
+  // Edit document handler
+  const handleEditDocument = (collectionName: string, document: any, documentId: string) => {
+    setEditingCollectionName(collectionName);
+    setEditingDocument({ ...document });
+    setEditingDocumentId(documentId);
+    setIsNewDocument(false);
+    setIsEditDialogOpen(true);
+  };
+
+  // Create new document handler
+  const handleNewDocument = (collectionName: string) => {
+    setEditingCollectionName(collectionName);
+    setEditingDocument(null);
+    setEditingDocumentId("");
+    setIsNewDocument(true);
+    setIsEditDialogOpen(true);
+  };
+
+  // Delete document handler
+  const handleDeleteDocument = async (collectionName: string, documentId: string) => {
+    if (!user || !confirm(`Êtes-vous sûr de vouloir supprimer le document "${documentId}" ?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/database/document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          collection: collectionName,
+          documentId,
+          action: 'delete',
+        }),
+      });
+
+      if (!response.ok) throw new Error('Delete failed');
+
+      // Recharger les données
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setMessage({ type: 'success', text: 'Document supprimé' });
+      
+      // Recharger les collections
+      const reloadResponse = await fetch('/api/fetch-database-collections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          siteId: selectedSiteId,
+          type: selectedDatabaseType,
+        }),
+      });
+      const reloadData = await reloadResponse.json();
+      setCollections(reloadData.collections || []);
+      
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      setMessage({ type: 'error', text: error.message || 'Erreur lors de la suppression' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  // Save document handler
+  const handleSaveDocument = async (data: any) => {
+    if (!user || !editingDocumentId && !isNewDocument) return;
+
+    try {
+      const docId = editingDocumentId || `doc-${Date.now()}`;
+
+      const response = await fetch('/api/database/document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          collection: editingCollectionName,
+          documentId: docId,
+          data,
+          action: 'save',
+        }),
+      });
+
+      if (!response.ok) throw new Error('Save failed');
+
+      setMessage({ type: 'success', text: 'Document sauvegardé' });
+      
+      // Recharger les collections
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const reloadResponse = await fetch('/api/fetch-database-collections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          siteId: selectedSiteId,
+          type: selectedDatabaseType,
+        }),
+      });
+      const reloadData = await reloadResponse.json();
+      setCollections(reloadData.collections || []);
+      
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Save error:', error);
+      throw new Error(error.message || 'Erreur lors de la sauvegarde');
+    }
+  };
+
   const currentSite = selectedSite;
   const currentDatabase = detectedDatabases.find(db => db.type === selectedDatabaseType);
 
@@ -410,7 +534,7 @@ export default function DatabasePage() {
               <div className="space-y-2">
                 {collections.map((col: any, idx: number) => (
                   <div key={idx}>
-                    <button
+                    <div
                       onClick={() => setExpandedCollection(expandedCollection === `col-${idx}` ? null : `col-${idx}`)}
                       className="w-full p-3 rounded-md border border-white/5 bg-white/2 cursor-pointer hover:bg-white/5 text-left transition-colors"
                     >
@@ -423,19 +547,52 @@ export default function DatabasePage() {
                           )}
                           <p className="font-semibold text-sm">{col.name}</p>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {col.count || 0} documents
-                        </Badge>
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          {expandedCollection === `col-${idx}` && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-xs hover:bg-green-500/20 hover:text-green-400"
+                              onClick={() => handleNewDocument(col.name)}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Ajouter
+                            </Button>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {col.count || 0} documents
+                          </Badge>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                     
                     {expandedCollection === `col-${idx}` && col.data && col.data.length > 0 && (
                       <div className="mt-2 ml-4 space-y-2 border-l border-pink-500/20 pl-4">
                         {col.data.map((doc: any, docIdx: number) => (
                           <div key={docIdx} className="p-3 rounded-md bg-zinc-900/50 border border-pink-500/10 text-xs hover:border-pink-500/30 transition-colors">
-                            <div className="flex items-center gap-2 mb-2">
-                              <FileJson className="h-3 w-3 text-pink-400" />
-                              <p className="font-mono text-blue-400">{doc.id || `doc-${docIdx}`}</p>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <FileJson className="h-3 w-3 text-pink-400" />
+                                <p className="font-mono text-blue-400">{doc.id || `doc-${docIdx}`}</p>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs hover:bg-blue-500/20 hover:text-blue-400"
+                                  onClick={() => handleEditDocument(col.name, doc, doc.id || `doc-${docIdx}`)}
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs hover:bg-red-500/20 hover:text-red-400"
+                                  onClick={() => handleDeleteDocument(col.name, doc.id || `doc-${docIdx}`)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                             <pre className="text-[10px] text-muted-foreground overflow-auto max-h-32 bg-black/30 p-2 rounded">
                               {JSON.stringify(doc, null, 2)}
@@ -451,7 +608,7 @@ export default function DatabasePage() {
               <div className="space-y-2">
                 {Object.entries(collections).map(([key, col]: [string, any]) => (
                   <div key={key}>
-                    <button
+                    <div
                       onClick={() => setExpandedCollection(expandedCollection === key ? null : key)}
                       className="w-full p-3 rounded-md border border-white/5 bg-white/2 cursor-pointer hover:bg-white/5 text-left transition-colors"
                     >
@@ -464,19 +621,52 @@ export default function DatabasePage() {
                           )}
                           <p className="font-semibold text-sm">{col.name}</p>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {col.count || 0} documents
-                        </Badge>
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          {expandedCollection === key && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-xs hover:bg-green-500/20 hover:text-green-400"
+                              onClick={() => handleNewDocument(col.name)}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Ajouter
+                            </Button>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {col.count || 0} documents
+                          </Badge>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                     
                     {expandedCollection === key && col.data && col.data.length > 0 && (
                       <div className="mt-2 ml-4 space-y-2 border-l border-pink-500/20 pl-4">
                         {col.data.map((doc: any, idx: number) => (
                           <div key={idx} className="p-3 rounded-md bg-zinc-900/50 border border-pink-500/10 text-xs hover:border-pink-500/30 transition-colors">
-                            <div className="flex items-center gap-2 mb-2">
-                              <FileJson className="h-3 w-3 text-pink-400" />
-                              <p className="font-mono text-blue-400">{doc.id}</p>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <FileJson className="h-3 w-3 text-pink-400" />
+                                <p className="font-mono text-blue-400">{doc.id}</p>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs hover:bg-blue-500/20 hover:text-blue-400"
+                                  onClick={() => handleEditDocument(col.name, doc, doc.id)}
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs hover:bg-red-500/20 hover:text-red-400"
+                                  onClick={() => handleDeleteDocument(col.name, doc.id)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                             <pre className="text-[10px] text-muted-foreground overflow-auto max-h-32 bg-black/30 p-2 rounded">
                               {JSON.stringify(doc, null, 2)}
@@ -649,6 +839,17 @@ export default function DatabasePage() {
           }}
         />
       )}
+
+      {/* Document Edit Dialog */}
+      <DocumentEditDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        onSave={handleSaveDocument}
+        document={editingDocument}
+        collectionName={editingCollectionName}
+        documentId={editingDocumentId}
+        isNewDocument={isNewDocument}
+      />
     </div>
   );
 }

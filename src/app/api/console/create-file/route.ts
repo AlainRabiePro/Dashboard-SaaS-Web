@@ -15,35 +15,16 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
-// Get language from file extension
-const getLanguageFromExtension = (filePath: string): string => {
-  const ext = path.extname(filePath).toLowerCase();
-  const languageMap: Record<string, string> = {
-    '.ts': 'typescript',
-    '.tsx': 'typescript',
-    '.js': 'javascript',
-    '.jsx': 'javascript',
-    '.json': 'json',
-    '.html': 'html',
-    '.css': 'css',
-    '.scss': 'scss',
-    '.md': 'markdown',
-    '.yml': 'yaml',
-    '.yaml': 'yaml',
-    '.env': 'properties',
-    '.sql': 'sql',
-    '.sh': 'bash',
-    '.py': 'python',
-  };
-  return languageMap[ext] || 'text';
-};
+interface CreateFileRequest {
+  filePath: string;
+  content: string;
+}
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id');
   const projectId = request.headers.get('x-project-id');
-  const filePath = request.nextUrl.searchParams.get('filePath');
 
-  if (!userId || !projectId || !filePath) {
+  if (!userId || !projectId) {
     return NextResponse.json(
       { error: 'Paramètres manquants' },
       { status: 400 }
@@ -51,6 +32,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const { filePath, content } = (await request.json()) as CreateFileRequest;
+
+    if (!filePath || content === undefined) {
+      return NextResponse.json(
+        { error: 'Chemin du fichier et contenu requis' },
+        { status: 400 }
+      );
+    }
+
     // Récupérer les infos du projet
     const projectRef = doc(db, 'users', userId, 'sites', projectId);
     const projectSnap = await getDoc(projectRef);
@@ -64,11 +54,10 @@ export async function GET(request: NextRequest) {
 
     const projectData = projectSnap.data();
     
-    // ✅ Utiliser le domaine réel si disponible
+    // Utiliser le domaine réel si disponible
     let domain = projectData?.domain || '';
     
     if (!domain) {
-      // Fallback: utiliser le nom du site
       domain = projectData?.siteName || projectData?.name || projectId;
     }
     
@@ -77,34 +66,33 @@ export async function GET(request: NextRequest) {
     const projectPath = `/var/www/${normalizedDomain}`;
     const fullPath = `${projectPath}/${filePath}`;
 
-    // ✅ Charger le contenu du fichier via SSH (uniquement si demandé!)
-    const content = await getFileContentViaSSH(fullPath);
+    // ✅ Créer le fichier via SSH
+    const created = await createFileViaSSH(fullPath, content);
     
-    if (content === null) {
+    if (!created) {
       return NextResponse.json(
-        { error: 'Fichier non trouvé ou non lisible' },
-        { status: 404 }
+        { error: 'Erreur lors de la création du fichier' },
+        { status: 500 }
       );
     }
 
     return NextResponse.json({
+      success: true,
       name: path.basename(filePath),
       path: filePath,
-      language: getLanguageFromExtension(filePath),
-      content: content,
-      size: content.length
+      message: 'Fichier créé avec succès'
     });
   } catch (error) {
-    console.error('❌ Error fetching file content:', error);
+    console.error('❌ Error creating file:', error);
     return NextResponse.json(
-      { error: 'Erreur lors du chargement du fichier', details: String(error) },
+      { error: 'Erreur lors de la création du fichier', details: String(error) },
       { status: 500 }
     );
   }
 }
 
-// ✅ Get file content from VPS
-const getFileContentViaSSH = async (filePath: string): Promise<string | null> => {
+// ✅ Create file on VPS
+const createFileViaSSH = async (filePath: string, content: string): Promise<boolean> => {
   try {
     const SSH = require('node-ssh').NodeSSH;
     const ssh = new SSH();
@@ -115,26 +103,32 @@ const getFileContentViaSSH = async (filePath: string): Promise<string | null> =>
       password: process.env.DEPLOY_SSH_PASSWORD,
     });
 
-    const readCmd = `cat "${filePath}"`;
-    const readResult = await ssh.execCommand(readCmd);
+    // Créer le répertoire parent s'il n'existe pas
+    const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
+    const mkdirCmd = `mkdir -p "${dirPath}"`;
+    await ssh.execCommand(mkdirCmd);
+
+    // Écrire le contenu dans le fichier
+    // Échapper les caractères spéciaux pour la sécurité
+    const escapedContent = content
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, '\\n');
+    
+    const writeCmd = `echo -e "${escapedContent}" > "${filePath}"`;
+    const result = await ssh.execCommand(writeCmd);
     
     ssh.dispose();
 
-    if (readResult.code === 0) {
-      const content = readResult.stdout;
-      
-      // Limiter la taille du contenu (max 1MB par fichier)
-      if (content.length <= 1048576) {
-        return content;
-      } else {
-        console.warn(`⚠️  Fichier trop volumineux: ${filePath} (${content.length} bytes)`);
-        return null;
-      }
+    if (result.code === 0) {
+      console.log(`✅ Fichier créé: ${filePath}`);
+      return true;
     }
     
-    return null;
+    console.error(`❌ Erreur création fichier: ${result.stderr}`);
+    return false;
   } catch (error: any) {
     console.error('❌ SSH Error:', error.message);
-    return null;
+    return false;
   }
 };

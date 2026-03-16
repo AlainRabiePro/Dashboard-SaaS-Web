@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,32 +44,47 @@ export async function POST(request: NextRequest) {
     };
 
     try {
-      // Get user's sites collections
-      const sitesRef = collection(db, 'users', userId, 'sites', siteId, 'data');
-      const snapshot = await getDocs(sitesRef);
+      // ✅ FIXED: Get the site document first
+      const siteDocRef = doc(db, 'users', userId, 'sites', siteId);
+      const siteDocSnap = await getDoc(siteDocRef);
 
-      if (snapshot.size > 0) {
-        snapshot.forEach(doc => {
-          exportData.collections.push({
-            name: doc.id,
-            data: doc.data(),
-            timestamp: new Date().toISOString(),
-          });
-        });
-      } else {
-        // Try alternate structure
-        const mainRef = collection(db, 'users', userId, 'sites', siteId);
-        const mainSnapshot = await getDocs(mainRef);
-        
-        mainSnapshot.forEach(doc => {
-          exportData.collections.push({
-            name: doc.id,
-            data: doc.data(),
-          });
-        });
+      if (siteDocSnap.exists()) {
+        // Export the site document data
+        exportData.siteData = siteDocSnap.data();
+      }
+
+      // Try to get any sub-collections of the site
+      // Get user's other collections (domains, logs, etc)
+      const collectionsToExport = ['domains', 'logs', 'settings', 'backups'];
+      
+      for (const collName of collectionsToExport) {
+        try {
+          const collRef = collection(db, 'users', userId, collName);
+          const snapshot = await getDocs(collRef);
+
+          if (snapshot.size > 0) {
+            const collData: any[] = [];
+            snapshot.forEach(doc => {
+              collData.push({
+                id: doc.id,
+                data: doc.data(),
+              });
+            });
+
+            if (collData.length > 0) {
+              exportData.collections.push({
+                name: collName,
+                documents: collData,
+                count: collData.length,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn(`⚠️  Collection "${collName}" not accessible or doesn't exist:`, e);
+        }
       }
     } catch (e) {
-      console.log('Fetching collections error:', e);
+      console.error('Error fetching collections:', e);
     }
 
     return NextResponse.json({

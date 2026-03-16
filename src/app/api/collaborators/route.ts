@@ -7,6 +7,7 @@ import {
   validateEmail,
   type Collaborator,
 } from '@/lib/collaborator-service';
+import { sendInvitationEmailViaResend, getInvitationEmailTemplate } from '@/lib/email-service';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -153,8 +154,16 @@ export async function POST(request: NextRequest) {
       request
     );
 
-    // TODO: Envoyer l'email d'invitation
-    // await sendInvitationEmail(email, invitationToken);
+    // 📧 Envoyer l'email d'invitation
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
+    const invitationLink = `${appUrl}/accept-invitation?token=${invitationToken}`;
+    
+    // Envoyer l'email (asynchrone, ne pas bloquer la réponse)
+    sendInvitationEmailViaResend(
+      email,
+      name || 'SaasFlow Admin',
+      invitationLink
+    ).catch(err => console.error('[COLLABORATORS] Error sending email:', err));
 
     return NextResponse.json({
       success: true,
@@ -162,7 +171,7 @@ export async function POST(request: NextRequest) {
         id: docRef.id,
         ...collaboratorData,
         invitationToken,
-        invitationLink: `${process.env.NEXT_PUBLIC_APP_URL}/accept-invitation?token=${invitationToken}`,
+        invitationLink,
       },
     });
   } catch (error: any) {

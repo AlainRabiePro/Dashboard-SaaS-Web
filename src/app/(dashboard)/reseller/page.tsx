@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { copyToClipboard } from '@/lib/clipboard-utils';
 import { 
   ShoppingCart, Percent, TrendingUp, Users, DollarSign, 
   Copy, CheckCircle2, AlertCircle, Globe, Target, Zap, BarChart3
@@ -108,15 +109,23 @@ export default function ResellerPage() {
     }
   };
 
-  const copyAffiliateLink = () => {
+  const copyAffiliateLink = async () => {
     if (profile?.affiliateLink) {
-      navigator.clipboard.writeText(profile.affiliateLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast({
-        title: 'Copié!',
-        description: 'Lien affilié copié dans le presse-papiers',
-      });
+      const success = await copyToClipboard(profile.affiliateLink);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        toast({
+          title: 'Copié!',
+          description: 'Lien affilié copié dans le presse-papiers',
+        });
+      } else {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de copier le lien',
+          variant: 'destructive',
+        });
+      }
     }
   };
 

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Code2, Copy, Trash2, Plus, Loader2, Check, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { copyToClipboard } from "@/lib/clipboard-utils";
 
 interface ApiKey {
   id: string;
@@ -184,10 +185,12 @@ export default function ApiPage() {
     }
   };
 
-  const copyToClipboard = (text: string, keyId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKeyId(keyId);
-    setTimeout(() => setCopiedKeyId(null), 2000);
+  const handleCopyKey = async (text: string, keyId: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedKeyId(keyId);
+      setTimeout(() => setCopiedKeyId(null), 2000);
+    }
   };
 
   return (
@@ -230,7 +233,7 @@ export default function ApiPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => copyToClipboard(key.key, key.id)}
+                          onClick={() => handleCopyKey(key.key, key.id)}
                           className="h-6 w-6 p-0"
                         >
                           {copiedKeyId === key.id ? (

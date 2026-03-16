@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Play, Trash2, Copy, Download, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard-utils';
 import type { DatabaseType } from '@/lib/database-types';
 
 interface QueryEditorProps {
@@ -43,31 +44,43 @@ export function QueryEditor({
   const [history, setHistory] = useState<QueryHistory[]>([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Détecter si on est côté client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Charger l'historique depuis le localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(`query-history-${siteId}-${databaseId}`);
-    if (saved) {
-      try {
+    if (!isClient || typeof window === 'undefined') return;
+    
+    try {
+      const saved = localStorage.getItem(`query-history-${siteId}-${databaseId}`);
+      if (saved) {
         setHistory(JSON.parse(saved).map((item: any) => ({
           ...item,
           executedAt: new Date(item.executedAt),
         })));
-      } catch (e) {
-        console.error('Error loading history:', e);
       }
+    } catch (e) {
+      console.error('Error loading history:', e);
     }
-  }, [siteId, databaseId]);
+  }, [siteId, databaseId, isClient]);
 
   // Sauvegarder l'historique
   useEffect(() => {
-    if (history.length > 0) {
+    if (!isClient || typeof window === 'undefined' || history.length === 0) return;
+    
+    try {
       localStorage.setItem(
         `query-history-${siteId}-${databaseId}`,
         JSON.stringify(history)
       );
+    } catch (e) {
+      console.error('Error saving history:', e);
     }
-  }, [history, siteId, databaseId]);
+  }, [history, siteId, databaseId, isClient]);
 
   const getPlaceholder = () => {
     switch (databaseType) {
@@ -147,8 +160,19 @@ export function QueryEditor({
     setSelectedHistoryId(historyItem.id);
   };
 
-  const handleCopyQuery = () => {
-    navigator.clipboard.writeText(query);
+  const handleCopyQuery = async () => {
+    const success = await copyToClipboard(query, 
+      () => {
+        // Succès silencieux
+      },
+      (error) => {
+        console.error('Copy failed:', error);
+      }
+    );
+    if (!success) {
+      // Notification d'erreur
+      console.warn('Could not copy to clipboard');
+    }
   };
 
   const handleExportResults = () => {
@@ -165,7 +189,13 @@ export function QueryEditor({
 
   const handleClearHistory = () => {
     setHistory([]);
-    localStorage.removeItem(`query-history-${siteId}-${databaseId}`);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(`query-history-${siteId}-${databaseId}`);
+      } catch (e) {
+        console.error('Error clearing history:', e);
+      }
+    }
     setShowDeleteConfirm(false);
   };
 

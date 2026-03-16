@@ -21,7 +21,8 @@ import {
   TrendingUp,
   AlertCircle,
   RefreshCw,
-  Github
+  Github,
+  FileText
 } from "lucide-react";
 import {
   Select,
@@ -55,6 +56,7 @@ import {
 import type { Site, UserProfile } from "@/lib/firestore-service";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { useTests } from "@/hooks/use-tests";
+import { TestResultDialog } from "@/components/test-result-dialog";
 
 interface TestSuite {
   id: string;
@@ -196,6 +198,9 @@ export default function TestsPage() {
   const [gitHubConfig, setGitHubConfig] = useState({ owner: "", repo: "", token: "", workflow: "" });
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [isLoadingGitHub, setIsLoadingGitHub] = useState(false);
+  const [selectedTestResult, setSelectedTestResult] = useState<any>(null);
+  const [showTestResultDialog, setShowTestResultDialog] = useState(false);
+  const [isCreatingExamples, setIsCreatingExamples] = useState(false);
 
   // Récupérer le profil utilisateur
   const profileRef = useMemo(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
@@ -300,6 +305,39 @@ export default function TestsPage() {
     }
   }, [gitHubConfig, fetchGitHubResults]);
 
+  // Créer des fichiers de test d'exemple
+  const createExampleTests = useCallback(async () => {
+    if (!selectedSiteId || !user?.uid) return;
+
+    const confirmed = confirm('Cela créera 4 fichiers de test d\'exemple dans le dossier __tests__. Continuer?');
+    if (!confirmed) return;
+
+    setIsCreatingExamples(true);
+    try {
+      const response = await fetch('/api/tests/create-example', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+          'x-project-id': selectedSiteId,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert('✅ Fichiers de test créés:\n\n' + data.files.map((f: string) => `• ${f}`).join('\n') + '\n\nLancez les tests pour les exécuter!');
+      } else {
+        const error = await response.json();
+        alert('❌ Erreur: ' + (error.error || 'Erreur inconnue'));
+      }
+    } catch (error) {
+      console.error('Error creating example tests:', error);
+      alert('Erreur lors de la création des tests d\'exemple');
+    } finally {
+      setIsCreatingExamples(false);
+    }
+  }, [selectedSiteId, user?.uid]);
+
   const formatDuration = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -372,6 +410,24 @@ export default function TestsPage() {
               <Button onClick={runAllTests} disabled={runningTests.length > 0} size="lg">
                 <Play className="h-4 w-4 mr-2" />
                 Lancer tous
+              </Button>
+              <Button 
+                onClick={createExampleTests} 
+                disabled={!selectedSiteId || isCreatingExamples}
+                variant="outline"
+                size="lg"
+              >
+                {isCreatingExamples ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Création...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Créer tests d'exemple
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -540,7 +596,14 @@ export default function TestsPage() {
                       </TableHeader>
                       <TableBody>
                         {testResults.map((run) => (
-                          <TableRow key={run.id}>
+                          <TableRow 
+                            key={run.id}
+                            className="cursor-pointer hover:bg-white/5 transition-colors"
+                            onClick={() => {
+                              setSelectedTestResult(run);
+                              setShowTestResultDialog(true);
+                            }}
+                          >
                             <TableCell className="font-medium">{run.name || run.suiteId}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
@@ -743,6 +806,13 @@ export default function TestsPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <TestResultDialog 
+        testResult={selectedTestResult}
+        open={showTestResultDialog}
+        onOpenChange={setShowTestResultDialog}
+        suiteName={selectedTestResult?.name || selectedTestResult?.suiteId}
+      />
     </div>
   );
 }

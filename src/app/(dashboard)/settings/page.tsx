@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { copyToClipboard } from "@/lib/clipboard-utils";
 import { UserProfile, updateUserProfile } from "@/lib/firestore-service";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -260,14 +261,22 @@ export default function SettingsPage() {
     }
   }
 
-  function copyApiKey() {
-    navigator.clipboard.writeText(apiKey);
-    setCopiedApiKey(true);
-    setTimeout(() => setCopiedApiKey(false), 2000);
-    toast({
-      title: "Copié",
-      description: "La clé API a été copiée dans le presse-papiers.",
-    });
+  async function copyApiKey() {
+    const success = await copyToClipboard(apiKey);
+    if (success) {
+      setCopiedApiKey(true);
+      setTimeout(() => setCopiedApiKey(false), 2000);
+      toast({
+        title: "Copié",
+        description: "La clé API a été copiée dans le presse-papiers.",
+      });
+    } else {
+      toast({
+        title: "Erreur",
+        description: "Impossible de copier la clé API",
+        variant: "destructive",
+      });
+    }
   }
 
   function regenerateApiKey() {

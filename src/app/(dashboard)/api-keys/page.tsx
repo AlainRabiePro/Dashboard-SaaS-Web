@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Key, Plus, Copy, Trash2, Eye, EyeOff, Loader2, Check, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { copyToClipboard } from "@/lib/clipboard-utils";
 import {
   Dialog,
   DialogTrigger,
@@ -87,10 +88,12 @@ export default function ApiKeysPage() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyKey = async (text: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -146,7 +149,7 @@ export default function ApiKeysPage() {
                           <Button 
                             variant="outline" 
                             className="flex-1"
-                            onClick={() => copyToClipboard(newKey.key)}
+                            onClick={() => handleCopyKey(newKey.key)}
                           >
                             {copied ? (
                               <>
@@ -231,7 +234,7 @@ export default function ApiKeysPage() {
                     <Button size="sm" variant="ghost" onClick={() => setShowKey(!showKey)}>
                       {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(key.key)}><Copy className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleCopyKey(key.key)}><Copy className="h-4 w-4" /></Button>
                     {key.status === 'active' && <Button size="sm" variant="ghost"><Trash2 className="h-4 w-4 text-red-500" /></Button>}
                   </div>
                 </div>
