@@ -74,7 +74,7 @@ export function DashboardSidebar() {
 
   return (
     <div className={cn(
-      "relative flex flex-col h-screen bg-background border-r border-border transition-all duration-300 ease-in-out z-40",
+      "fixed inset-y-0 left-0 flex flex-col h-screen bg-background border-r border-border transition-all duration-300 ease-in-out z-40",
       collapsed ? "w-[60px]" : "w-64"
     )}>
       {/* Brand Section */}

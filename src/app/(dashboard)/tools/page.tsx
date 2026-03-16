@@ -217,6 +217,89 @@ export default function ToolsPage() {
     }
   ];
 
+  const handleSync = async () => {
+    try {
+      console.log('🚀 [TOOLS] Starting sync...', {
+        userId: user?.uid,
+        timestamp: new Date().toISOString()
+      });
+      setLoadingStates(prev => ({ ...prev, 'save': true }));
+      
+      const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.uid || '',
+        },
+        body: JSON.stringify({ type: 'full' }),
+      });
+
+      if (!response.ok) throw new Error('Sync failed');
+
+      const data = await response.json();
+      console.log('✅ [TOOLS] Sync completed:', {
+        synced: data.synced,
+        timestamp: new Date(data.timestamp).toISOString(),
+        sites: data.sites.map((s: any) => s.name),
+        response: data
+      });
+      
+      setLoadingStates(prev => ({ ...prev, 'save': false }));
+      
+      toast({
+        title: "✅ Synchronisation complétée",
+        description: `${data.synced} site(s) synchronisé(s) avec le cloud Firestore en temps réel`,
+      });
+    } catch (error) {
+      console.error('❌ [TOOLS] Sync error:', error);
+      setLoadingStates(prev => ({ ...prev, 'save': false }));
+      toast({
+        variant: "destructive",
+        title: "❌ Erreur",
+        description: (error as any).message,
+      });
+    }
+  };
+
+  const handleClearCache = async () => {
+    try {
+      console.log('🚀 [TOOLS] Starting cache clear...', {
+        userId: user?.uid,
+        timestamp: new Date().toISOString()
+      });
+      const response = await fetch('/api/cache', {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': user?.uid || '',
+        },
+      });
+
+      if (!response.ok) throw new Error('Cache clear failed');
+
+      const data = await response.json();
+      console.log('✅ [TOOLS] Cache cleared:', {
+        cleared: data.cleared,
+        timestamp: new Date().toISOString(),
+        response: data
+      });
+      
+      setLoadingStates(prev => ({ ...prev, 'cache': false }));
+      
+      toast({
+        title: "🗑️ Cache vidé",
+        description: `Votre cache a été vidé avec succès. Firestore mis à jour à ${new Date().toLocaleTimeString()}`,
+      });
+    } catch (error) {
+      console.error('❌ [TOOLS] Cache clear error:', error);
+      setLoadingStates(prev => ({ ...prev, 'cache': false }));
+      toast({
+        variant: "destructive",
+        title: "❌ Erreur",
+        description: (error as any).message,
+      });
+    }
+  };
+
   const handleToolAction = (toolId: string, title: string, isLocked: boolean) => {
     if (isLocked) {
       toast({
@@ -244,14 +327,7 @@ export default function ToolsPage() {
 
     if (toolId === 'save') {
       setLoadingStates(prev => ({ ...prev, [toolId]: true }));
-      // Simulation d'un "Push" vers l'infrastructure
-      setTimeout(() => {
-        setLoadingStates(prev => ({ ...prev, [toolId]: false }));
-        toast({
-          title: "Push effectué",
-          description: "Vos configurations locales ont été poussées vers l'infrastructure cloud avec succès.",
-        });
-      }, 2000);
+      handleSync();
       return;
     }
 
@@ -281,13 +357,7 @@ export default function ToolsPage() {
 
     if (toolId === 'cache') {
       setLoadingStates(prev => ({ ...prev, [toolId]: true }));
-      setTimeout(() => {
-        setLoadingStates(prev => ({ ...prev, [toolId]: false }));
-        toast({
-          title: "🗑️ Cache vidé",
-          description: "Le cache a été vidé avec succès. Votre site sera à jour dans quelques secondes.",
-        });
-      }, 1500);
+      handleClearCache();
       return;
     }
 
@@ -458,6 +528,13 @@ export default function ToolsPage() {
 
     setAdsLoading(true);
     try {
+      console.log('🚀 [TOOLS] Configuring AdSense...', {
+        siteId: selectedAdsSiteId,
+        publisherId: adsenseId,
+        userId: user.uid,
+        timestamp: new Date().toISOString()
+      });
+      
       const selectedSite = sites.find(s => s.id === selectedAdsSiteId);
       if (!selectedSite) {
         throw new Error('Site non trouvé');
@@ -470,17 +547,21 @@ export default function ToolsPage() {
       }
 
       // Appeler l'API de configuration AdSense
-      const response = await fetch('/api/configure-adsense', {
+      const response = await fetch('/api/ads/config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
+          'x-user-id': user.uid,
         },
         body: JSON.stringify({
-          userId: user.uid,
-          siteId: selectedAdsSiteId,
-          domain: selectedSite.name,
-          adsenseId: adsenseId,
+          publisherId: adsenseId,
+          enabled: true,
+          settings: {
+            autoRefresh: true,
+            refreshInterval: 60000,
+            adSenseApproved: true,
+            lastUpdated: Date.now(),
+          },
         }),
       });
 
@@ -490,17 +571,24 @@ export default function ToolsPage() {
       }
 
       const result = await response.json();
+      console.log('✅ [TOOLS] AdSense config saved:', {
+        siteId: selectedAdsSiteId,
+        publisherId: adsenseId,
+        timestamp: new Date().toISOString(),
+        path: `users/${user.uid}/ads_config/main`,
+        response: result
+      });
 
       toast({
         title: "✅ AdSense configuré",
-        description: `AdSense a été configuré avec succès pour ${selectedSite.name}`,
+        description: `${adsenseId} sauvegardé dans Firestore pour ${selectedSite.name}`,
       });
 
       setIsAdsOpen(false);
       setSelectedAdsSiteId(null);
       setAdsenseId("");
     } catch (error: any) {
-      console.error('Erreur de configuration AdSense:', error);
+      console.error('❌ [TOOLS] AdSense error:', error);
       toast({
         variant: "destructive",
         title: "❌ Erreur",
@@ -511,13 +599,54 @@ export default function ToolsPage() {
     }
   };
 
-  const handleRestoreCommit = (commitId: string) => {
-    toast({
-      title: "Restauration demandée",
-      description: `La version ${commitId} est en cours de déploiement sur votre infrastructure.`,
-    });
-    setIsBackupOpen(false);
-    setSelectedSiteId(null);
+  const handleRestoreCommit = async (commitId: string) => {
+    try {
+      if (!user || !selectedSiteId) return;
+
+      console.log('🚀 [TOOLS] Restoring backup:', {
+        commitId,
+        siteId: selectedSiteId,
+        userId: user.uid,
+        timestamp: new Date().toISOString()
+      });
+      
+      const response = await fetch('/api/backup', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          backupId: commitId,
+          siteId: selectedSiteId,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Restore failed');
+
+      const data = await response.json();
+      console.log('✅ [TOOLS] Backup restored:', {
+        commitId,
+        siteId: selectedSiteId,
+        timestamp: new Date().toISOString(),
+        path: `users/${user.uid}/backups/${commitId}`,
+        response: data
+      });
+      
+      toast({
+        title: "✅ Restauration lancée",
+        description: `La version ${commitId} est en cours de déploiement depuis Firestore`,
+      });
+      setIsBackupOpen(false);
+      setSelectedSiteId(null);
+    } catch (error) {
+      console.error('❌ [TOOLS] Restore error:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Erreur",
+        description: (error as any).message,
+      });
+    }
   };
 
   const isLocked = (minPlan: string) => {

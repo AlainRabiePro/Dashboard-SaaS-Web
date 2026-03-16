@@ -14,12 +14,12 @@ export default function PublicNavbar() {
           </span>
         </Link>
         <div className="flex gap-4 items-center">
-          <Link href="/pricing" className="text-slate-300 hover:text-white transition">
+          <a href="/#pricing" className="text-slate-300 hover:text-white transition">
             Tarifs
-          </Link>
-          <Link href="/faq" className="text-slate-300 hover:text-white transition">
+          </a>
+          <a href="/#faq" className="text-slate-300 hover:text-white transition">
             FAQ
-          </Link>
+          </a>
           <Link href="/login" className="text-slate-300 hover:text-white transition">
             Se Connecter
           </Link>

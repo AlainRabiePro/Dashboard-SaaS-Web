@@ -4,7 +4,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import LandingPage from "./landing-page";
+import LandingPage from "@/presentations/landing-page";
 
 export default function HomePage() {
   const { user, loading } = useAuth();

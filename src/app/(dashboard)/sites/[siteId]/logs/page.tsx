@@ -45,7 +45,7 @@ export default function SiteLogsPage() {
     if (!user || !site) return;
 
     try {
-      const token = await user.getIdToken();
+      const token = await user.getIdToken(true);
       const response = await fetch("/api/get-site-logs", {
         method: "POST",
         headers: {
@@ -61,6 +61,10 @@ export default function SiteLogsPage() {
       if (response.ok) {
         const data = await response.json();
         setLogs(data.logs || []);
+      } else {
+        console.error(`API Error: ${response.status} - ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Response:", errorData);
       }
     } catch (error) {
       console.error("Erreur lors de la récupération des logs:", error);

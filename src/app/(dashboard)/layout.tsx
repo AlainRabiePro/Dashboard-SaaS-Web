@@ -34,7 +34,7 @@ export default function DashboardLayout({
     <DashboardProtection>
       <div className="flex min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
         <DashboardSidebar />
-        <main className="flex-1 overflow-auto dashboard-grid-bg">
+        <main className="flex-1 overflow-auto dashboard-grid-bg transition-all duration-300 ease-in-out [margin-left:16rem]">
           <div className="max-w-[1200px] mx-auto px-4 py-8 md:px-8">
             {children}
           </div>
