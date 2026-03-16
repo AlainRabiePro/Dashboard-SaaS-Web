@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { initializeFirebase } from '@/firebase';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
 
 /**
  * API pour initialiser l'espace utilisateur sur le VPS
@@ -102,6 +104,24 @@ export async function POST(request: NextRequest) {
         { error: 'userId invalide' },
         { status: 400 }
       );
+    }
+
+    // Initialiser le document utilisateur dans Firestore avec plan free
+    const { firestore: db } = initializeFirebase();
+    const userRef = doc(db, 'users', userId);
+    
+    try {
+      await setDoc(userRef, {
+        subscription: {
+          plan: 'free',
+          createdAt: Timestamp.now(),
+        },
+        createdAt: Timestamp.now(),
+      }, { merge: true }); // merge pour ne pas overwrite d'autres données
+      console.log(`✅ User subscription initialized in Firestore for ${userId}`);
+    } catch (dbError) {
+      console.error(`⚠️ Warning: Failed to initialize user in Firestore:`, dbError);
+      // Ne pas bloquer si Firestore échoue, le VPS init est prioritaire
     }
 
     // Initialiser l'espace utilisateur

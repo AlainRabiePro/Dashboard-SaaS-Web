@@ -7,7 +7,8 @@
  */
 export async function sendInvitationEmailViaResend(
   email: string,
-  senderName: string,
+  senderEmail: string,
+  projectName: string,
   invitationLink: string
 ): Promise<boolean> {
   try {
@@ -18,7 +19,7 @@ export async function sendInvitationEmailViaResend(
       return false;
     }
 
-    const { subject, html, text } = getInvitationEmailTemplate(senderName, invitationLink);
+    const { subject, html, text } = getInvitationEmailTemplate(senderEmail, projectName, invitationLink);
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -55,14 +56,16 @@ export async function sendInvitationEmailViaResend(
  * Format pour template d'email d'invitation
  */
 export function getInvitationEmailTemplate(
-  senderName: string,
+  senderEmail: string,
+  projectName: string,
   invitationLink: string
 ): {
   subject: string;
   html: string;
   text: string;
 } {
-  const subject = `${senderName} vous invite à rejoindre SaasFlow`;
+  const senderName = senderEmail.split('@')[0];
+  const subject = `${senderName} vous invite à rejoindre "${projectName}" sur SaasFlow`;
 
   const html = `
 <!DOCTYPE html>
@@ -70,64 +73,83 @@ export function getInvitationEmailTemplate(
   <head>
     <meta charset="utf-8">
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { text-align: center; margin-bottom: 30px; }
-      .content { color: #333; line-height: 1.6; }
-      .button { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 20px 0; }
-      .footer { color: #888; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; line-height: 1.6; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; }
+      .email-wrapper { background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+      .header { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 40px 20px; text-align: center; }
+      .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+      .content { padding: 40px 20px; }
+      .content p { margin: 15px 0; color: #333; }
+      .project-name { font-weight: bold; color: #0ea5e9; }
+      .button-container { text-align: center; margin: 30px 0; }
+      .button { display: inline-block; background: #0ea5e9; color: white; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px; }
+      .button:hover { background: #0284c7; }
+      .link-section { margin: 20px 0; padding: 15px; background-color: #f3f4f6; border-radius: 6px; }
+      .link-label { font-size: 12px; color: #666; text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
+      .link-value { word-break: break-all; font-size: 12px; color: #0ea5e9; font-family: monospace; }
+      .footer { background-color: #f9fafb; padding: 20px; border-top: 1px solid #e5e7eb; color: #666; font-size: 12px; text-align: center; }
     </style>
   </head>
   <body>
     <div class="container">
-      <div class="header">
-        <h1>Vous êtes invité à SaasFlow</h1>
-      </div>
-      
-      <div class="content">
-        <p>Bonjour,</p>
-        
-        <p><strong>${senderName}</strong> vous a invité à rejoindre <strong>SaasFlow</strong>, une plateforme de gestion de sites web moderne.</p>
-        
-        <p>Cliquez sur le bouton ci-dessous pour accepter l'invitation et créer votre compte :</p>
-        
-        <div style="text-align: center;">
-          <a href="${invitationLink}" class="button">Accepter l'invitation</a>
+      <div class="email-wrapper">
+        <div class="header">
+          <h1>✉️ Vous êtes invité!</h1>
         </div>
         
-        <p>Ou copiez ce lien dans votre navigateur :</p>
-        <p style="word-break: break-all; font-size: 12px; color: #666;">${invitationLink}</p>
+        <div class="content">
+          <p>Bonjour,</p>
+          
+          <p><strong>${senderName}</strong> vous invite à rejoindre le projet <span class="project-name">"${projectName}"</span> sur SaasFlow.</p>
+          
+          <p>Rejoignez l'équipe en cliquant sur le bouton ci-dessous pour créer votre compte et commencer à collaborer :</p>
+          
+          <div class="button-container">
+            <a href="${invitationLink}" class="button">Accepter l'invitation</a>
+          </div>
+          
+          <p>Ou copiez ce lien dans votre navigateur :</p>
+          
+          <div class="link-section">
+            <div class="link-label">Lien d'invitation</div>
+            <div class="link-value">${invitationLink}</div>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            <strong>À noter :</strong> Ce lien d'invitation peut être utilisé par plusieurs personnes et expirera une fois que la limite du plan d'abonnement sera atteinte.
+          </p>
+        </div>
         
-        <p>Cette invitation expire dans 24 heures.</p>
-        
-        <p>Si vous n'avez pas demandé cette invitation, vous pouvez ignorer cet email.</p>
-      </div>
-      
-      <div class="footer">
-        <p>© 2026 SaasFlow. Tous droits réservés.</p>
+        <div class="footer">
+          <p>Vous avez reçu cet email car quelqu'un vous a invité à rejoindre un projet sur SaasFlow.</p>
+          <p>© SaasFlow. Tous droits réservés.</p>
+        </div>
       </div>
     </div>
   </body>
 </html>
-  `;
+`;
 
   const text = `
-Vous êtes invité à SaasFlow
+Vous êtes invité!
 
 Bonjour,
 
-${senderName} vous a invité à rejoindre SaasFlow, une plateforme de gestion de sites web moderne.
+${senderName} vous invite à rejoindre le projet "${projectName}" sur SaasFlow.
 
-Cliquez sur le lien ci-dessous pour accepter l'invitation et créer votre compte :
-
+Lien d'invitation:
 ${invitationLink}
 
-Cette invitation expire dans 24 heures.
+Collez ce lien dans votre navigateur pour créer votre compte et rejoindre le projet.
 
-Si vous n'avez pas demandé cette invitation, vous pouvez ignorer cet email.
+À noter: Ce lien d'invitation peut être utilisé par plusieurs personnes et expirera une fois que la limite du plan d'abonnement sera atteinte.
 
-© 2026 SaasFlow. Tous droits réservés.
-  `;
+© SaasFlow
+`;
 
-  return { subject, html, text };
+  return {
+    subject,
+    html,
+    text,
+  };
 }

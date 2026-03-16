@@ -7,17 +7,17 @@ import { getInvitationEmailTemplate } from '@/lib/email-service';
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, senderName, senderEmail, invitationLink } = await request.json();
+    const { email, senderName, senderEmail, projectName, invitationLink } = await request.json();
 
-    if (!email || !senderName || !invitationLink) {
+    if (!email || !senderEmail || !projectName || !invitationLink) {
       return NextResponse.json(
-        { error: 'Missing required fields: email, senderName, invitationLink' },
+        { error: 'Missing required fields: email, senderEmail, projectName, invitationLink' },
         { status: 400 }
       );
     }
 
-    // Obtenir le template
-    const { subject, html, text } = getInvitationEmailTemplate(senderName, invitationLink);
+    // Obtenir le template avec la nouvelle signature
+    const { subject, html, text } = getInvitationEmailTemplate(senderEmail, projectName, invitationLink);
 
     // Utiliser Resend API si disponible
     const resendApiKey = process.env.RESEND_API_KEY;

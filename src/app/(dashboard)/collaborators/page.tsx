@@ -7,17 +7,22 @@ import { useAuth } from "@/context/AuthContext";
 import { InviteCollaboratorDialog } from "@/components/invite-collaborator-dialog";
 import { CollaboratorRow } from "@/components/collaborator-row";
 import { RolePermissionsDisplay } from "@/components/role-permissions-display";
+import { CollaboratorsPaywall } from "@/components/CollaboratorsPaywall";
 import { type Collaborator } from "@/lib/collaborator-service";
 
 export default function CollaboratorsPage() {
   const { user } = useAuth();
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
+  const [requiresAddon, setRequiresAddon] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
 
   const fetchCollaborators = async () => {
     if (!user?.uid) return;
     try {
       setLoading(true);
+      
+      // Récupérer les collaborateurs
       const response = await fetch('/api/collaborators', {
         headers: { 'x-user-id': user.uid }
       });
@@ -25,6 +30,7 @@ export default function CollaboratorsPage() {
         const data = await response.json();
         setCollaborators(data.collaborators || []);
       }
+      
     } catch (error) {
       console.error('Error fetching collaborators:', error);
     } finally {
@@ -54,6 +60,16 @@ export default function CollaboratorsPage() {
       </div>
 
       <div className="grid gap-6">
+        {/* Paywall pour plus de 3 collaborateurs */}
+        {collaborators.length >= 3 && !requiresAddon && (
+          <CollaboratorsPaywall 
+            addonPrice={2}
+            onSubscribe={() => {
+              window.location.href = '/billing/addons/collaborators';
+            }}
+          />
+        )}
+
         {/* Membres actifs */}
         <Card className="border-white/5 bg-zinc-950/50 backdrop-blur-sm">
           <CardHeader>
@@ -61,15 +77,20 @@ export default function CollaboratorsPage() {
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-blue-500" />
                 <div>
-                  <CardTitle>Membres actifs</CardTitle>
+                  <CardTitle>Membres actifs ({collaborators.length})</CardTitle>
                   <CardDescription>Votre équipe SaasFlow</CardDescription>
                 </div>
               </div>
-              {user?.uid && (
+              {user?.uid && collaborators.length < 3 && (
                 <InviteCollaboratorDialog
                   userId={user.uid}
                   onInvite={handleCollaboratorUpdate}
                 />
+              )}
+              {user?.uid && collaborators.length >= 3 && (
+                <div className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded">
+                  Limite de 3 collaborateurs atteinte. Passez à l'add-on pour plus.
+                </div>
               )}
             </div>
           </CardHeader>

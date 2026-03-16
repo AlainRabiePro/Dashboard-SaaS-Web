@@ -60,6 +60,17 @@ export function InviteCollaboratorDialog({
 
       if (!response.ok) {
         const data = await response.json();
+        
+        // Si l'add-on est requis, rediriger vers la page d'achat
+        if (data.requiresAddon) {
+          setError('Limite atteinte. Débloquez l\'add-on Team Collaborators pour ajouter plus de membres.');
+          // Redirection après fermeture du dialog
+          setTimeout(() => {
+            window.location.href = '/billing/addons/collaborators';
+          }, 1500);
+          return;
+        }
+        
         setError(data.error || 'Erreur lors de l\'invitation');
         return;
       }

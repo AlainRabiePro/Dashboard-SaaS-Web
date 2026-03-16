@@ -128,6 +128,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ✅ Vérifier la limite de 3 collaborateurs
+    const totalCollaborators = existingDocs.docs.length;
+    if (totalCollaborators >= 3) {
+      return NextResponse.json(
+        { 
+          error: 'Collaborator limit reached',
+          message: 'Vous avez atteint la limite de 3 collaborateurs. Passez à l\'add-on Team Collaborators pour inviter plus de personnes.',
+          requiresAddon: true,
+          limit: 3,
+          current: totalCollaborators,
+        },
+        { status: 403 }
+      );
+    }
+
     // Créer le collaborateur
     const invitationToken = generateInvitationToken();
     const invitationExpiresAt = generateInvitationExpiry();
