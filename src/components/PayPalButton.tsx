@@ -31,7 +31,50 @@ export function PayPalButton({
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    if (!window.paypal || !user?.uid) return;
+    if (!user?.uid) {
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID) {
+      setError('PayPal is not configured');
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    let checkAttempts = 0;
+    const maxAttempts = 50; // 5 secondes à 100ms
+
+    // Attendre que PayPal SDK soit chargé
+    const checkPayPalLoaded = setInterval(() => {
+      checkAttempts++;
+      
+      if (window.paypal) {
+        clearInterval(checkPayPalLoaded);
+        if (isMounted) {
+          initPayPalButton();
+        }
+      }
+      
+      if (checkAttempts >= maxAttempts) {
+        clearInterval(checkPayPalLoaded);
+        if (isMounted) {
+          setError('PayPal SDK failed to load. Please refresh the page.');
+          setLoading(false);
+        }
+      }
+    }, 100);
+
+    return () => {
+      isMounted = false;
+      clearInterval(checkPayPalLoaded);
+    };
+  }, [user?.uid]);
+
+  const initPayPalButton = () => {
+    if (!containerRef.current || !window.paypal) return;
 
     setLoading(true);
     setError('');
@@ -46,7 +89,7 @@ export function PayPalButton({
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': user.uid,
+                'x-user-id': user?.uid || '',
               },
               body: JSON.stringify({
                 planId,
@@ -72,7 +115,7 @@ export function PayPalButton({
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': user.uid,
+                'x-user-id': user?.uid || '',
               },
               body: JSON.stringify({
                 orderId: data.orderID,
@@ -113,7 +156,7 @@ export function PayPalButton({
     } finally {
       setLoading(false);
     }
-  }, [user?.uid, planId, planName, amount, onSuccess, onError]);
+  };
 
   if (error) {
     return (
@@ -125,14 +168,18 @@ export function PayPalButton({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading PayPal...</span>
+      <div className="flex flex-col items-center justify-center py-8 gap-2">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="text-sm text-muted-foreground">Chargement de PayPal...</span>
       </div>
     );
   }
 
-  return <div ref={containerRef} className="paypal-button-container" />;
+  return (
+    <div className="w-full">
+      <div ref={containerRef} className="paypal-button-container" />
+    </div>
+  );
 }
 
 export default PayPalButton;
