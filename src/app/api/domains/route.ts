@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 
 const firebaseConfig = {
@@ -98,6 +98,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id: docRef.id });
   } catch (error: any) {
     console.error('Error adding domain:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id');
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { domainId } = await request.json();
+    if (!domainId) {
+      return NextResponse.json({ error: 'Domain ID is required' }, { status: 400 });
+    }
+
+    // Delete the domain document
+    const domainRef = doc(db, 'users', userId, 'domains', domainId);
+    await deleteDoc(domainRef);
+
+    return NextResponse.json({ success: true, message: 'Domain deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting domain:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

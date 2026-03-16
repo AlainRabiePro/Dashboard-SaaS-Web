@@ -52,9 +52,10 @@ interface LogEntry {
 
 interface FileContent {
   name: string;
-  content: string;
+  content?: string | null;
   language: string;
   path: string;
+  size?: string | number;
 }
 
 interface Project {
@@ -108,6 +109,33 @@ export default function ConsolePage() {
     fetchProjects();
   }, [user?.uid]);
 
+  // Load file content on demand
+  const handleLoadFileContent = async (file: FileContent) => {
+    if (!user?.uid || !selectedProject) return;
+    
+    // Si le contenu est déjà présent, utiliser le fichier directement
+    if (file.content) {
+      setSelectedFile(file);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/console/file-content?filePath=${encodeURIComponent(file.path)}`, {
+        headers: { 'x-user-id': user.uid, 'x-project-id': selectedProject }
+      });
+      
+      if (!response.ok) {
+        console.error('Error loading file content:', response.statusText);
+        return;
+      }
+      
+      const fileData = await response.json();
+      setSelectedFile(fileData);
+    } catch (error) {
+      console.error('Error loading file content:', error);
+    }
+  };
+
   // Fetch files when project changes
   useEffect(() => {
     const fetchData = async () => {
@@ -130,9 +158,9 @@ export default function ConsolePage() {
         setLogs(logsData.logs || []);
         setFiles(filesData.files || []);
         
-        // Select first file by default
+        // Select first file and load its content
         if (filesData.files?.length > 0) {
-          setSelectedFile(filesData.files[0]);
+          handleLoadFileContent(filesData.files[0]);
         } else {
           setSelectedFile(null);
         }
@@ -450,7 +478,7 @@ export default function ConsolePage() {
                   files.map((file) => (
                     <button
                       key={file.path}
-                      onClick={() => setSelectedFile(file)}
+                      onClick={() => handleLoadFileContent(file)}
                       className={`px-3 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap ${
                         selectedFile?.path === file.path
                           ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'

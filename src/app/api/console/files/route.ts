@@ -16,77 +16,12 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
 
-// Fonction pour lire les fichiers depuis le VPS via SSH
-const readProjectFilesViaSSH = async (projectPath: string, maxFiles: number = 50): Promise<FileContent[]> => {
-  try {
-    const SSH = require('node-ssh').NodeSSH;
-    const ssh = new SSH();
-
-    await ssh.connect({
-      host: process.env.DEPLOY_SSH_HOST,
-      username: process.env.DEPLOY_SSH_USER,
-      password: process.env.DEPLOY_SSH_PASSWORD,
-    });
-
-    const files: FileContent[] = [];
-    
-    // Vérifier que le répertoire existe
-    const testCmd = `[ -d "${projectPath}" ] && echo "EXISTS" || echo "NOT_FOUND"`;
-    const testResult = await ssh.execCommand(testCmd);
-    
-    if (!testResult.stdout.includes('EXISTS')) {
-      ssh.dispose();
-      return [];
-    }
-    
-    // Lire les fichiers de manière récursive via SSH
-    const findCmd = `find ${projectPath} -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.next/*' | head -${maxFiles}`;
-    const findResult = await ssh.execCommand(findCmd);
-    
-    if (findResult.code !== 0) {
-      ssh.dispose();
-      return [];
-    }
-
-    const fileList = findResult.stdout.split('\n').filter(Boolean);
-    
-    for (const filePath of fileList) {
-      if (files.length >= maxFiles) break;
-      
-      // Lire le contenu du fichier
-      const readCmd = `cat "${filePath}"`;
-      const readResult = await ssh.execCommand(readCmd);
-      
-      if (readResult.code === 0) {
-        const content = readResult.stdout;
-        
-        // Limiter la taille du contenu (max 100KB par fichier)
-        if (content.length <= 102400) {
-          const relativePath = filePath.replace(projectPath + '/', '');
-          files.push({
-            name: path.basename(filePath),
-            path: relativePath,
-            language: getLanguageFromExtension(filePath),
-            content: content
-          });
-        }
-      }
-    }
-    
-    console.log(`✅ ${files.length} fichiers lus via SSH`);
-    ssh.dispose();
-    return files;
-  } catch (error: any) {
-    console.error('❌ Erreur SSH:', error.message || String(error));
-    return [];
-  }
-};
-
 interface FileContent {
   name: string;
-  content: string;
+  content?: string | null;
   language: string;
   path: string;
+  size?: string;
 }
 
 // Détermine le langage en fonction de l'extension
@@ -112,62 +47,8 @@ const getLanguageFromExtension = (filePath: string): string => {
   return languageMap[ext] || 'text';
 };
 
-// Récursivement lire les fichiers du projet
-const readProjectFiles = async (projectPath: string, basePath: string = '', maxFiles: number = 50): Promise<FileContent[]> => {
-  const files: FileContent[] = [];
-  let fileCount = 0;
-
-  const ignoreDirs = ['node_modules', '.next', '.git', '.vercel', 'dist', 'build', '.env.local'];
-  const ignoreFiles = ['.DS_Store', '.gitignore'];
-
-  const traverse = async (dir: string, relPath: string = '') => {
-    if (fileCount >= maxFiles) return;
-
-    try {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (fileCount >= maxFiles) break;
-
-        const fullPath = path.join(dir, entry.name);
-        const relativePath = relPath ? `${relPath}/${entry.name}` : entry.name;
-
-        // Ignorer les dossiers et fichiers inutiles
-        if (entry.isDirectory()) {
-          if (!ignoreDirs.includes(entry.name)) {
-            await traverse(fullPath, relativePath);
-          }
-        } else {
-          if (!ignoreFiles.includes(entry.name) && fileCount < maxFiles) {
-            try {
-              const content = await fs.readFile(fullPath, 'utf-8');
-              
-              // Limiter la taille du contenu (max 100KB par fichier)
-              if (content.length > 102400) {
-                continue;
-              }
-
-              files.push({
-                name: entry.name,
-                path: relativePath,
-                language: getLanguageFromExtension(entry.name),
-                content: content
-              });
-              fileCount++;
-            } catch (err) {
-              // Ignore les erreurs de lecture (fichiers binaires, etc)
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error(`Error reading directory ${dir}:`, err);
-    }
-  };
-
-  await traverse(projectPath);
-  return files;
-};
+// Récursivement lire les fichiers du projet (non utilisé mais conservé pour compatibilité)
+// const readProjectFiles = async (projectPath: string, basePath: string = '', maxFiles: number = 50): Promise<FileContent[]> => { ... }
 
 export async function GET(request: NextRequest) {
   const userId = request.headers.get('x-user-id');
@@ -196,63 +77,42 @@ export async function GET(request: NextRequest) {
     const projectName = projectData?.siteName || projectData?.name || 'Mon Projet';
     let domain = projectData?.domain || '';
     
-    // Si domain est vide, essayer de l'extraire de siteName/name (compatibilité avec sites existants)
+    // Si domain est vide, essayer de l'extraire de siteName/name
     if (!domain) {
-      // Extraire le domaine du siteName si c'est une URL/domaine
       if (projectName && projectName.includes('.')) {
         domain = projectName;
       } else {
-        // Sinon utiliser le nom du projet formaté
         domain = projectName;
       }
     }
     
-    // Construire le chemin du projet: /var/www/{domain}
-    // Normaliser le domaine : "instacraft.fr" -> "instacraft-fr"
+    // Normaliser le domaine
     const normalizedDomain = domain.toLowerCase().replace(/\./g, '-').replace(/\s+/g, '-');
     const projectPath = `/var/www/${normalizedDomain}`;
 
-    // Vérifier que le dossier existe localement ou sur le VPS
-    let files: FileContent[] = [];
+    console.log(`📂 Loading file list from: ${projectPath}`);
     
-    try {
-      await fs.access(projectPath);
-      // Lire localement si le chemin existe
-      files = await readProjectFiles(projectPath);
-    } catch (err: any) {
-      // Si le dossier n'existe pas localement, essayer via SSH (déploiement sur VPS)
-      // Essayer de lire via SSH depuis le VPS
-      files = await readProjectFilesViaSSH(projectPath);
-      
-      if (files.length === 0) {
-        // Si SSH aussi échoue, retourner le message par défaut
-        return NextResponse.json({
-          files: [
-            {
-              name: 'README.md',
-              path: 'README.md',
-              language: 'markdown',
-              content: `# ${projectName}\n\nLe projet n'a pas été trouvé localement ni sur le serveur VPS.\n\nVérifiez que le déploiement s'est bien déroulé.`
-            }
-          ],
-          total: 1,
-          project: { id: projectId, name: projectName },
-          source: 'error'
-        });
-      }
-      
-      console.log(`✅ ${files.length} fichiers lus via SSH`);
-    }
-
-    // Ajouter un README si le projet est vide
+    // ✅ OPTIMIZED: Only load file list first (not content!)
+    const files = await getFileListViaSSH(projectPath);
+    
     if (files.length === 0) {
-      files.push({
-        name: 'README.md',
-        path: 'README.md',
-        language: 'markdown',
-        content: `# ${projectName}\n\nProjet vide. Commencez à ajouter des fichiers!`
+      return NextResponse.json({
+        files: [
+          {
+            name: 'README.md',
+            path: 'README.md',
+            language: 'markdown',
+            content: `# ${projectName}\n\nLe projet n'a pas été trouvé ou est vide.`,
+            size: '0'
+          }
+        ],
+        total: 1,
+        project: { id: projectId, name: projectName, domain },
+        source: 'error'
       });
     }
+
+    console.log(`✅ Found ${files.length} files`);
 
     return NextResponse.json({
       files,
@@ -261,10 +121,50 @@ export async function GET(request: NextRequest) {
       source: 'filesystem'
     });
   } catch (error) {
-    console.error('Error fetching files:', error);
+    console.error('❌ Error fetching files:', error);
     return NextResponse.json(
       { error: 'Erreur lors du chargement des fichiers', details: String(error) },
       { status: 500 }
     );
+  }
+}
+
+// ✅ FAST: Get only file list (NO content loading!)
+const getFileListViaSSH = async (projectPath: string, maxFiles: number = 500): Promise<any[]> => {
+  try {
+    const SSH = require('node-ssh').NodeSSH;
+    const ssh = new SSH();
+
+    await ssh.connect({
+      host: process.env.DEPLOY_SSH_HOST,
+      username: process.env.DEPLOY_SSH_USER,
+      password: process.env.DEPLOY_SSH_PASSWORD,
+    });
+
+    // Only get file names and sizes - NOT full content!
+    const findCmd = `find "${projectPath}" -type f \\( -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.next/*' -not -path '*/dist/*' -not -path '*/build/*' \\) 2>/dev/null | head -${maxFiles}`;
+    const findResult = await ssh.execCommand(findCmd);
+    
+    if (findResult.code !== 0) {
+      console.warn('⚠️  Find command failed:', findResult.stderr);
+      ssh.dispose();
+      return [];
+    }
+
+    const filePaths = findResult.stdout.split('\n').filter(Boolean);
+    
+    const fileList = filePaths.map(filePath => ({
+      name: path.basename(filePath),
+      path: filePath.replace(projectPath + '/', ''),
+      language: getLanguageFromExtension(filePath),
+      size: '?',  // Size will be loaded on demand
+      content: null  // ⚠️ Content NOT loaded! Fast!
+    }));
+
+    ssh.dispose();
+    return fileList;
+  } catch (error: any) {
+    console.error('❌ SSH Error:', error.message);
+    return [];
   }
 }

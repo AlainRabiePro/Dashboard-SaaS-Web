@@ -41,6 +41,7 @@ export default function DomainsPage() {
   const [isOpenDialog, setIsOpenDialog] = useState(false);
   const [newDomain, setNewDomain] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingDomainId, setDeletingDomainId] = useState<string | null>(null);
   
   // Search & Buy states
   const [searchInput, setSearchInput] = useState("");
@@ -118,11 +119,41 @@ export default function DomainsPage() {
 
   const handleDeleteDomain = async (domainId: string) => {
     if (!user?.uid) return;
-    // TODO: Implement delete endpoint
-    toast({
-      title: "À venir",
-      description: "La suppression de domaine sera disponible bientôt",
-    });
+    
+    setDeletingDomainId(domainId);
+    try {
+      const response = await fetch('/api/domains', {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': user.uid,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ domainId }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Succès",
+          description: "Le domaine a été supprimé avec succès",
+        });
+        await fetchDomains();
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Erreur",
+          description: error.error || "Impossible de supprimer le domaine",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Une erreur s'est produite",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingDomainId(null);
+    }
   };
 
   const filteredDomains = domains.filter(d => 
@@ -358,13 +389,43 @@ export default function DomainsPage() {
                       {domain.pointsTo || '-'}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteDomain(domain.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                            disabled={deletingDomainId === domain.id}
+                          >
+                            {deletingDomainId === domain.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-zinc-950 border-white/5">
+                          <DialogHeader>
+                            <DialogTitle>Supprimer le domaine</DialogTitle>
+                            <DialogDescription>
+                              Êtes-vous sûr de vouloir supprimer <span className="font-mono font-semibold text-white">{domain.name}</span> ? Cette action est irréversible.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button variant="outline" disabled={deletingDomainId === domain.id}>
+                              Annuler
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={() => handleDeleteDomain(domain.id)}
+                              disabled={deletingDomainId === domain.id}
+                            >
+                              {deletingDomainId === domain.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                              Supprimer
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </TableCell>
                   </TableRow>
                 ))
