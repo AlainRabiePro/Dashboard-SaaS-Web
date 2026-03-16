@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getDoc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
-export default function AcceptInvitationPage() {
+function AcceptInvitationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -289,5 +289,13 @@ export default function AcceptInvitationPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Chargement...</div>}>
+      <AcceptInvitationContent />
+    </Suspense>
   );
 }
